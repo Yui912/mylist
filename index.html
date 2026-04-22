@@ -117,6 +117,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 <div class="header">
   <div class="header-top">
     <div style="display:flex;align-items:center;gap:8px">
+      <button id="btn-menu" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">≡</button>
       <div class="header-title">My List</div>
       <div class="hcount" id="total-count">0人</div>
     </div>
@@ -148,7 +149,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 
 <script>
 var LECS = ['洗剤','化粧品','サプリ','水・空気','鍋'];
-var allFlags = ['アプローチしない'];
+var allFlags = ['直以外', 'アプローチしない'];
 var curFilter = 'all';
 var curCat = 'all';
 var curP = null;
@@ -173,7 +174,7 @@ function loadFromSheet(){
         people.forEach(function(p){
           if(p.flags && p.flags.length){
             p.flags.forEach(function(f){
-              if(f !== 'アプローチしない' && !allFlags.includes(f)){
+              if(f !== 'アプローチしない' && f !== '直以外' && !allFlags.includes(f)){
                 allFlags.push(f);
               }
             });
@@ -203,6 +204,14 @@ function dsince(d){if(!d)return 9999;return Math.round((new Date()-new Date(d))/
 function fmtD(d){if(!d)return null;var dt=new Date(d);return (dt.getMonth()+1)+'/'+dt.getDate()}
 function nextId(){return Math.max.apply(null,[0].concat(people.map(function(p){return p.id})))+1}
 
+function bdDaysUntil(bd){
+  var now=new Date();now.setHours(0,0,0,0);
+  var parts=bd.split('-');
+  var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+  if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
+  return Math.round((next-now)/86400000);
+}
+
 function getList(){
   var list=people.slice();
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
@@ -210,13 +219,6 @@ function getList(){
   if(curFilter==='reminder'){
     list=list.filter(function(p){return p.reminder}).sort(function(a,b){return new Date(a.reminder)-new Date(b.reminder)});
   } else if(curFilter==='birthday'){
-    function bdDaysUntil(bd){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=bd.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000);
-    }
     list=list.filter(function(p){
       if(!p.birthday)return false;
       var d=bdDaysUntil(p.birthday);
@@ -529,7 +531,7 @@ function showSheet(html){
 function openFlagMgr(onClose){
   function refresh(){
     var listHTML = allFlags.map(function(f, i){
-      if(f==='アプローチしない'){
+      if(f==='アプローチしない'||f==='直以外'){
         return '<div style="display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border)">'
           +'<span style="flex:1;font-size:14px;color:var(--ink3);padding:7px 10px">'+f+'（変更不可）</span>'
           +'</div>';
@@ -720,6 +722,338 @@ function openSearch(){
   }
 }
 
+
+
+function openMenu(){
+  showSheet(
+    '<div class="shdr"><div style="font-size:17px;font-weight:700">メニュー</div>'
+    +'<button class="sclose" id="btn-close">✕</button></div>'
+    +'<div class="ssec">'
+    +'<div id="menu-my-list" style="display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--border);cursor:pointer">'
+    +'<span style="font-size:22px">👥</span>'
+    +'<div><div style="font-size:15px;font-weight:600">My List</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:2px">見込み客リストを管理</div></div></div>'
+    +'<div id="menu-map" style="display:flex;align-items:center;gap:14px;padding:16px 0;cursor:pointer">'
+    +'<span style="font-size:22px">🗺</span>'
+    +'<div><div style="font-size:15px;font-weight:600">MAPアップロード</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:2px">手書きMAPを読み取ってログに反映</div></div></div>'
+    +'</div>'
+  );
+  document.getElementById('btn-close').onclick = closeSheet;
+  document.getElementById('menu-my-list').onclick = closeSheet;
+  document.getElementById('menu-map').onclick = function(){ closeSheet(); setTimeout(openMapUpload, 300); };
+}
+
+function openMapUpload(){
+  showSheet(
+    '<div class="shdr"><div style="font-size:17px;font-weight:700">MAPアップロード</div>'
+    +'<button class="sclose" id="btn-close">✕</button></div>'
+    +'<div class="ssec">'
+    +'<div style="font-size:13px;color:var(--ink2);margin-bottom:16px;line-height:1.6">'
+    +'MAPの写真をアップロードすると、Claudeが各人の周辺に書かれた情報を読み取ってコミュニケーション履歴に追記します。</div>'
+    +'<label style="display:block;border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;background:var(--surface2)">'
+    +'<input type="file" id="map-file" accept="image/*" style="display:none">'
+    +'<div style="font-size:32px;margin-bottom:8px">📷</div>'
+    +'<div style="font-size:14px;font-weight:600;color:var(--ink2)">タップして写真を選択</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:4px">JPG・PNG対応</div>'
+    +'</label>'
+    +'<div id="map-preview" style="margin-top:12px"></div>'
+    +'</div>'
+    +'<div id="map-analyze-wrap" style="display:none;padding:16px 20px">'
+    +'<button id="btn-analyze" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">MAP を解析する</button>'
+    +'</div>'
+    +'<div id="map-result"></div>'
+  );
+  document.getElementById('btn-close').onclick = closeSheet;
+  document.getElementById('map-file').addEventListener('change', function(){
+    var file = this.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      document.getElementById('map-preview').innerHTML =
+        '<img src="' + e.target.result + '" style="width:100%;border-radius:8px">';
+      document.getElementById('map-analyze-wrap').style.display = 'block';
+      document.getElementById('btn-analyze').onclick = function(){
+        doAnalyzeMap(e.target.result);
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function doAnalyzeMap(dataUrl){
+  var btn = document.getElementById('btn-analyze');
+  btn.textContent = '解析中…';
+  btn.disabled = true;
+
+  var base64 = dataUrl.split(',')[1];
+  var mediaType = dataUrl.split(';')[0].split(':')[1];
+  var names = people.map(function(p){ return p.name; }).join('、');
+
+  var promptText = 'これはAmwayビジネスのMAP（手書き計画表）の写真です。'
+    + 'このMAPには①よめてるMAP（今月確定しているPV数が各人の丸の横に数字で書いてある）と'
+    + '②イメージMAP（月末の目標状態・アクション・アポ日・メモが各人の周辺に書いてある）の2つのセクションがあります。'
+    + '同じ人物が両方のセクションに登場する場合は統合してください。'
+    + '丸数字（①②③…）はPV数を表します。日付は月/日の形式です。'
+    + '既知の人物リスト: ' + names + '\n\n'
+    + 'JSON形式のみで返答してください（他のテキスト不要）:\n'
+    + '{"people":['
+    + '{"name":"既知リストと一致する名前",'
+    + '"pv_current":よめてるMAPのPV数（数字、なければnull）,'
+    + '"pv_target":イメージMAPの目標PV数（数字、なければnull）,'
+    + '"actions":["アポ日・次のアクション等のリスト"],'
+    + '"memo":"状況・メモ・その他の情報"}'
+    + '],'
+    + '"unrecognized":['
+    + '{"name":"既知リストにない名前",'
+    + '"pv_current":よめてるMAPのPV数またはnull,'
+    + '"pv_target":イメージMAPの目標PV数またはnull,'
+    + '"actions":["アクションリスト"],'
+    + '"memo":"メモ"}'
+    + ']}';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: promptText }
+        ]
+      }]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var text = data.content && data.content[0] && data.content[0].text;
+    if(!text){ mapError('解析に失敗しました'); return; }
+    try {
+      var clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
+      showMapResult(JSON.parse(clean));
+    } catch(e){ mapError('結果の読み取りに失敗しました'); }
+  })
+  .catch(function(){ mapError('通信エラーが発生しました'); });
+}
+
+function mapError(msg){
+  var btn = document.getElementById('btn-analyze');
+  if(btn){ btn.textContent = 'MAP を解析する'; btn.disabled = false; }
+  toast(msg);
+}
+
+function showMapResult(result){
+  var btn = document.getElementById('btn-analyze');
+  if(btn){ btn.textContent = 'MAP を解析する'; btn.disabled = false; }
+  var section = document.getElementById('map-result');
+  if(!section) return;
+
+  var now = new Date();
+  var dateStr = (now.getMonth()+1) + '/' + now.getDate();
+  function makeLogText(item){
+    var parts = [];
+    if(item.pv_current) parts.push('現PV: ' + item.pv_current);
+    if(item.pv_target) parts.push('目標PV: ' + item.pv_target);
+    if(item.actions && item.actions.length) parts.push('アクション: ' + item.actions.join('、'));
+    if(item.memo) parts.push(item.memo);
+    return parts.join(' / ');
+  }
+
+  function makeInfoHTML(item){
+    var rows = [];
+    if(item.pv_current||item.pv_target){
+      rows.push('<div style="display:flex;gap:12px;margin-bottom:4px">'
+        +(item.pv_current?'<span style="font-size:12px;font-weight:700;color:var(--blue)">現PV: '+item.pv_current+'</span>':'')
+        +(item.pv_target?'<span style="font-size:12px;font-weight:700;color:var(--accent)">目標: '+item.pv_target+'</span>':'')
+        +'</div>');
+    }
+    if(item.actions && item.actions.length){
+      rows.push('<div style="font-size:12px;color:var(--ink2);margin-bottom:3px">📅 '+item.actions.join('　')+'</div>');
+    }
+    if(item.memo){
+      rows.push('<div style="font-size:12px;color:var(--ink2)">📝 '+item.memo+'</div>');
+    }
+    return '<div style="background:var(--surface2);padding:8px;border-radius:8px;line-height:1.6;margin-bottom:8px">'+rows.join('')+'</div>';
+  }
+
+  var allItems = (result.people || []);
+  var recItems = allItems.filter(function(item){
+    return people.some(function(p){ return p.name === item.name; });
+  });
+  var unrecItems = (result.unrecognized || []).concat(
+    allItems.filter(function(item){
+      return !people.some(function(p){ return p.name === item.name; });
+    })
+  );
+
+  var html = '';
+
+  if(recItems.length){
+    html += '<div class="ssec"><div class="ssec-title">✅ 認識できた人（' + recItems.length + '人）</div>';
+    recItems.forEach(function(item, idx){
+      html += '<div style="padding:12px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">' + item.name + '</div>'
+        + makeInfoHTML(item)
+        + '<button class="map-add-btn" data-idx="' + idx + '" '
+        + 'style="padding:6px 14px;background:var(--green);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">ログに追加 ✓</button>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  if(unrecItems.length){
+    html += '<div class="ssec"><div class="ssec-title">❓ 確認が必要（' + unrecItems.length + '人）</div>';
+    unrecItems.forEach(function(item, idx){
+      var candidates = people.filter(function(p){
+        return p.name.indexOf(item.name) !== -1 || item.name.indexOf(p.name) !== -1;
+      }).slice(0,4);
+      var candHTML = candidates.map(function(p){
+        return '<button class="map-cand-btn" data-idx="' + idx + '" data-pid="' + p.id + '" '
+          + 'style="padding:6px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'
+          + p.name + '</button>';
+      }).join('');
+      html += '<div style="padding:12px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">「' + item.name + '」</div>'
+        + makeInfoHTML(item)
+        + '<div style="font-size:11px;color:var(--ink3);margin-bottom:6px">誰ですか？</div>'
+        + '<div class="map-cand-wrap" data-unidx="' + idx + '" style="display:flex;flex-wrap:wrap;gap:6px">'
+        + candHTML
+        + '<button class="map-search-btn" data-unidx="' + idx + '" style="padding:6px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">🔍 検索</button>'
+        + '<button class="map-new-btn" data-unidx="' + idx + '" style="padding:6px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">＋ 新規</button>'
+        + '<button class="map-naoi-btn" data-unidx="' + idx + '" style="padding:6px 12px;background:#FEF3E2;border:1.5px solid #E8A030;border-radius:8px;font-size:12px;font-weight:600;color:#C07800;cursor:pointer">直以外</button>'
+        + '<button class="map-skip-btn" data-unidx="' + idx + '" style="padding:6px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--ink3);cursor:pointer">記録しない</button>'
+        + '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  if(!recItems.length && !unrecItems.length){
+    html = '<div class="ssec"><div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px">人物が検出されませんでした</div></div>';
+  }
+
+  section.innerHTML = html;
+
+  // ログに追加
+  section.querySelectorAll('.map-add-btn').forEach(function(btn){
+    btn.onclick = function(){
+      var item = recItems[parseInt(btn.dataset.idx)];
+      var p = people.find(function(x){ return x.name === item.name; });
+      if(!p) return;
+      p.logs.unshift({ date: dateStr, text: 'MAP: ' + makeLogText(item) });
+      saveToSheet(p);
+      btn.textContent = '追加済み ✓';
+      btn.style.background = 'var(--ink3)';
+      btn.disabled = true;
+      toast(p.name + ' のログに追加しました');
+    };
+  });
+
+  // 候補者選択
+  section.querySelectorAll('.map-cand-btn').forEach(function(btn){
+    btn.onclick = function(){
+      var item = unrecItems[parseInt(btn.dataset.idx)];
+      var p = people.find(function(x){ return x.id === parseInt(btn.dataset.pid); });
+      if(!p) return;
+      p.logs.unshift({ date: dateStr, text: 'MAP: ' + makeLogText(item) });
+      saveToSheet(p);
+      var wrap = section.querySelector('.map-cand-wrap[data-unidx="' + btn.dataset.idx + '"]');
+      if(wrap) wrap.innerHTML = '<span style="font-size:12px;color:var(--green);font-weight:600">✓ ' + p.name + ' に追加しました</span>';
+      toast(p.name + ' のログに追加しました');
+    };
+  });
+
+  // 検索
+  section.querySelectorAll('.map-search-btn').forEach(function(btn){
+    btn.onclick = function(){
+      var item = unrecItems[parseInt(btn.dataset.unidx)];
+      openMapSearch(item, parseInt(btn.dataset.unidx), dateStr);
+    };
+  });
+
+  // 直以外フラグON
+  section.querySelectorAll('.map-naoi-btn').forEach(function(btn){
+    btn.onclick = function(){
+      var unidx = parseInt(btn.dataset.unidx);
+      var item = unrecItems[unidx];
+      var wrap = section.querySelector('.map-cand-wrap[data-unidx="' + unidx + '"]');
+      // 名前が一致する人がいればフラグON、いなければ新規追加して即フラグON
+      var p = people.find(function(x){ return x.name === item.name; });
+      if(p){
+        if(!p.flags.includes('直以外')) p.flags.push('直以外');
+        saveToSheet(p);
+        if(wrap) wrap.innerHTML = '<span style="font-size:12px;color:#C07800;font-weight:600">直以外フラグをONにしました</span>';
+        toast(p.name + ' に「直以外」フラグを設定しました');
+      } else {
+        if(wrap) wrap.innerHTML = '<span style="font-size:12px;color:var(--ink3)">新規追加後に「直以外」フラグを設定してください</span>';
+        toast('リストにいない人です。新規追加してからフラグを設定してください');
+      }
+    };
+  });
+
+  // 記録しない
+  section.querySelectorAll('.map-skip-btn').forEach(function(btn){
+    btn.onclick = function(){
+      var unidx = parseInt(btn.dataset.unidx);
+      var wrap = section.querySelector('.map-cand-wrap[data-unidx="' + unidx + '"]');
+      if(wrap) wrap.innerHTML = '<span style="font-size:12px;color:var(--ink3)">記録しませんでした</span>';
+    };
+  });
+
+  // 新規追加
+  section.querySelectorAll('.map-new-btn').forEach(function(btn){
+    btn.onclick = function(){
+      var item = unrecItems[parseInt(btn.dataset.unidx)];
+      closeSheet();
+      setTimeout(function(){
+        openAdd();
+        setTimeout(function(){
+          var nameEl = document.getElementById('f-name');
+          if(nameEl) nameEl.value = item.name;
+        }, 100);
+      }, 300);
+      toast('新規追加後、ログは手動で追加してください');
+    };
+  });
+}
+
+function openMapSearch(item, unidx, dateStr){
+  var savedResult = document.getElementById('map-result') ? document.getElementById('map-result').innerHTML : '';
+  showSheet(
+    '<div class="shdr"><div style="font-size:17px;font-weight:700">「' + item.name + '」は誰？</div>'
+    +'<button class="sclose" id="btn-close">✕</button></div>'
+    +'<div class="ssec"><input class="efield" id="map-s-inp" placeholder="名前で検索…" style="font-size:15px"></div>'
+    +'<div id="map-s-list" style="padding:0 20px"></div>'
+  );
+  document.getElementById('btn-close').onclick = closeSheet;
+  var inp = document.getElementById('map-s-inp');
+  if(inp) inp.focus();
+  inp.addEventListener('input', function(){
+    var q = inp.value.trim();
+    var listEl = document.getElementById('map-s-list');
+    if(!q){ listEl.innerHTML = ''; return; }
+    var hits = people.filter(function(p){ return p.name.indexOf(q) !== -1; });
+    listEl.innerHTML = hits.map(function(p){
+      return '<div class="ms-item" data-pid="' + p.id + '" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        + '<span style="font-size:15px;font-weight:600">' + p.name + '</span>'
+        + '<span style="font-size:12px;color:var(--ink3)">選択 →</span>'
+        + '</div>';
+    }).join('') || '<div style="color:var(--ink3);font-size:13px;padding:16px;text-align:center">該当なし</div>';
+    listEl.querySelectorAll('.ms-item').forEach(function(el){
+      el.onclick = function(){
+        var p = people.find(function(x){ return x.id === parseInt(el.dataset.pid); });
+        if(!p) return;
+        p.logs.unshift({ date: dateStr, text: 'MAP: ' + item.info });
+        saveToSheet(p);
+        closeSheet();
+        toast(p.name + ' のログに追加しました');
+      };
+    });
+  });
+}
+
 function closeSheet(){
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').classList.remove('open');
@@ -738,6 +1072,7 @@ if(btnFlagMgr)btnFlagMgr.onclick=function(){openFlagMgr(function(){render();})};
 document.getElementById('overlay').onclick=closeSheet;
 // チップはrenderChips()で動的生成
 document.getElementById('btn-search').onclick=openSearch;
+document.getElementById('btn-menu').onclick=openMenu;
 document.querySelectorAll('.tab').forEach(function(el){
   el.onclick=function(){
     curCat=el.dataset.c;
