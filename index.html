@@ -120,6 +120,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
       <div class="header-title">My List</div>
       <div class="hcount" id="total-count">0人</div>
     </div>
+    <div id="owner-label" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="font-size:11px;color:var(--ink3)" id="filter-count"></div>
       <button class="hadd" id="btn-add">＋</button>
@@ -156,6 +157,10 @@ var curFilter = 'all';
 var curCat = 'all';
 var curP = null;
 
+// URLパラメータからownerを取得
+var urlParams = new URLSearchParams(window.location.search);
+var OWNER = urlParams.get('u') || 'default';
+
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbw2EBflnMw7aNdMShBe1SrjaaWC8m0_Toe0b5L6SmfWOOfe7JDYqCNmyWf6Jjo366MR/exec';
 var people = [];
 var isLoading = false;
@@ -163,7 +168,7 @@ var isLoading = false;
 function loadFromSheet(){
   isLoading = true;
   document.getElementById('list-wrap').innerHTML = '<div class="empty">読み込み中…</div>';
-  fetch(GAS_URL + '?action=getAll')
+  fetch(GAS_URL + '?action=getAll&owner=' + OWNER)
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data.people) people = data.people;
@@ -177,6 +182,7 @@ function loadFromSheet(){
 }
 
 function saveToSheet(person){
+  person.owner = OWNER;
   fetch(GAS_URL, {
     method: 'POST',
     body: JSON.stringify({ action: 'save', person: person })
@@ -203,6 +209,8 @@ function getList(){
 function render(){
   var list=getList();
   document.getElementById('total-count').textContent=people.length+'人';
+  var ol=document.getElementById('owner-label');
+  if(ol)ol.textContent=OWNER!=='default'?OWNER:'';
   document.getElementById('filter-count').textContent=list.length!==people.length?'表示中 '+list.length+'人':'';
 
   var rc=people.filter(function(p){return p.reminder}).length;
