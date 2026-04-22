@@ -298,10 +298,20 @@ function cHTML(p){
   var lc=dl.length?'<div class="lecrow">'+dl.map(function(l){return '<span class="lchip">'+l+'</span>'}).join('')+'</div>':'';
   var ls=p.lastContact?'<div class="mitem"><span class="mdot" style="background:var(--ink3)"></span>'+dsince(p.lastContact)+'日前</div>':'';
   var mm=p.memo?'<div class="cmemo">'+p.memo+'</div>':'';
+  var bdStr='';
+  if(p.birthday){
+    var now=new Date();now.setHours(0,0,0,0);
+    var parts=p.birthday.split('-');
+    var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+    if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
+    var dbd=Math.round((next-now)/86400000);
+    var bdLabel=dbd===0?'🎂 今日！':dbd===1?'🎂 明日':dbd===-1?'🎂 昨日':'🎂 '+(parseInt(parts[1]))+'/'+(parseInt(parts[2]));
+    bdStr='<div class="mitem" style="color:#E8A030;font-weight:600">'+bdLabel+'</div>';
+  }
   return '<div class="'+cls+'" onclick="openDetail('+p.id+')">'
     +'<div class="ctop"><div style="flex:1;min-width:0"><div class="cname">'+p.name+'</div>'+mm+'</div>'
     +'<div class="cbadges">'+sb+fb+'</div></div>'
-    +'<div class="cmeta">'+ls+rt+'</div>'+lc+'</div>';
+    +'<div class="cmeta">'+ls+bdStr+rt+'</div>'+lc+'</div>';
 }
 
 function openDetail(id){
