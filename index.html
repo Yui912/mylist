@@ -126,13 +126,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
       <button class="hadd" id="btn-add">＋</button>
     </div>
   </div>
-  <div class="chip-strip">
-    <button id="btn-flag-mgr" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">＋</button>
-    <div class="chip active" data-f="all">すべて</div>
-    <div class="chip" data-f="reminder"><span class="cdot"></span><span class="clabel">リマインドあり</span></div>
-    <div class="chip" data-f="nocontact"><span class="cdot" style="background:var(--accent2)"></span><span class="clabel">連絡なし</span></div>
-    <div class="chip" data-f="random"><span class="clabel">🎲 ランダム</span></div>
-    <div class="chip" data-f="noflag"><span class="clabel">未着手</span></div>
+  <div class="chip-strip" id="chip-strip">
+    <!-- 動的に生成 -->
   </div>
   <div class="tabs">
     <div class="tab active" data-c="all">全員</div>
@@ -200,9 +195,33 @@ function getList(){
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
   if(curFilter!=='all')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
   if(curFilter==='reminder'){list=list.filter(function(p){return p.reminder}).sort(function(a,b){return new Date(a.reminder)-new Date(b.reminder)})}
-  else if(curFilter==='nocontact'){list=list.filter(function(p){return dsince(p.lastContact)>30}).sort(function(a,b){return dsince(b.lastContact)-dsince(a.lastContact)})}
+  else if(curFilter==='birthday'){
+    var now=new Date();
+    list=list.filter(function(p){
+      if(!p.birthday)return false;
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
+      return (next-now)/86400000<=30;
+    }).sort(function(a,b){
+      function daysUntil(bd){
+        var now=new Date();var parts=bd.split('-');
+        var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+        if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
+        return (next-now)/86400000;
+      }
+      return daysUntil(a.birthday)-daysUntil(b.birthday);
+    });
+  }
   else if(curFilter==='random'){list=list.sort(function(){return Math.random()-.5}).slice(0,5)}
-  else if(curFilter==='noflag'){list=list.filter(function(p){return p.flags.length===0&&!p.reminder})}
+  else if(curFilter==='noapproach'){list=list.filter(function(p){return p.flags.includes('アプローチしない')})}
+  else {
+    // カスタムフラグフィルタ
+    var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
+    if(customFlags.includes(curFilter)){
+      list=list.filter(function(p){return p.flags.includes(curFilter)});
+    }
+  }
   return list;
 }
 
@@ -213,17 +232,7 @@ function render(){
   if(ol)ol.textContent=OWNER!=='default'?OWNER:'';
   document.getElementById('filter-count').textContent=list.length!==people.length?'表示中 '+list.length+'人':'';
 
-  var rc=people.filter(function(p){return p.reminder}).length;
-  var nc=people.filter(function(p){return dsince(p.lastContact)>30}).length;
-  var fc=people.filter(function(p){return p.flags.length===0&&!p.reminder}).length;
-  document.querySelectorAll('.chip').forEach(function(el){
-    var f=el.dataset.f;
-    var lbl=el.querySelector('.clabel');
-    if(!lbl)return;
-    if(f==='reminder')lbl.textContent='リマインドあり ('+rc+')';
-    else if(f==='nocontact')lbl.textContent='連絡なし ('+nc+')';
-    else if(f==='noflag')lbl.textContent='未着手 ('+fc+')';
-  });
+  renderChips();
 
   var wrap=document.getElementById('list-wrap');
   if(list.length===0){wrap.innerHTML='<div class="empty">該当する人がいません</div>';return}
@@ -236,11 +245,14 @@ function render(){
     if(over.length){html+='<div class="slabel">⚠️ 期限切れ</div>';over.forEach(function(p){html+=cHTML(p)})}
     if(soon.length){html+='<div class="slabel">🔴 今すぐ</div>';soon.forEach(function(p){html+=cHTML(p)})}
     if(up.length){html+='<div class="slabel">近日中</div>';up.forEach(function(p){html+=cHTML(p)})}
-  } else if(curFilter==='nocontact'){
-    html+='<div class="slabel">📭 しばらく連絡なし</div>';
+  } else if(curFilter==='birthday'){
+    html+='<div class="slabel">🎂 誕生日が近い人</div>';
     list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
+    list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='noapproach'){
+    html+='<div class="slabel">アプローチしない</div>';
     list.forEach(function(p){html+=cHTML(p)});
   } else {
     list.forEach(function(p){html+=cHTML(p)});
@@ -297,6 +309,8 @@ function dHTML(p){
     +'<input class="efield" type="date" id="f-reminder" value="'+(p.reminder||'')+'"></div>'
     +'<div class="erow"><div class="elabel">📣 マーケ日</div>'
     +'<input class="efield" type="date" id="f-maker" value="'+(p.makerDate?p.makerDate.replace(/\//g,'-'):'')+'"></div>'
+    +'<div class="erow"><div class="elabel">🎂 誕生日</div>'
+    +'<input class="efield" type="date" id="f-birthday" value="'+(p.birthday||'')+'"></div>'
     +'<div class="erow"><div class="elabel">フラグ</div>'
     +'<div class="fwrap" id="fwrap">'+fb+'<button class="fadd" id="btn-fadd">＋</button></div></div></div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
@@ -318,6 +332,8 @@ function bindDetail(){
     if(m)p.memo=m.value;
     if(r)p.reminder=r.value||null;
     if(mk)p.makerDate=mk.value||null;
+    var bd=document.getElementById('f-birthday');
+    if(bd)p.birthday=bd.value||null;
     document.querySelectorAll('[data-lec]').forEach(function(el){
       p.lectures[el.dataset.lec]=el.value?el.value.replace(/-/g,'/'):null;
     });
@@ -329,6 +345,7 @@ function bindDetail(){
   var fm=document.getElementById('f-memo');if(fm)fm.addEventListener('input',save);
   var fr=document.getElementById('f-reminder');if(fr)fr.addEventListener('change',save);
   var fmk=document.getElementById('f-maker');if(fmk)fmk.addEventListener('change',save);
+  var fbd=document.getElementById('f-birthday');if(fbd)fbd.addEventListener('change',save);
   document.querySelectorAll('[data-lec]').forEach(function(el){el.addEventListener('change',save)});
 
   document.querySelectorAll('[data-s]').forEach(function(btn){
@@ -402,6 +419,7 @@ function openAdd(){
     +'</div></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="f-reminder"></div>'
     +'<div class="erow"><div class="elabel">📣 マーケ日</div><input class="efield" type="date" id="f-maker"></div>'
+    +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="f-birthday"></div>'
     +'</div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
     +'<div class="ssec"><button class="savebtn" id="btn-save">追加する</button></div>'
@@ -426,6 +444,7 @@ function openAdd(){
     var memo=document.getElementById('f-memo');
     var rem=document.getElementById('f-reminder');
     var mk=document.getElementById('f-maker');
+    var bd=document.getElementById('f-birthday');
     people.unshift({
       id:nextId(),name:name,
       memo:memo?memo.value.trim():'',
@@ -433,6 +452,7 @@ function openAdd(){
       reminder:rem?rem.value||null:null,
       lastContact:todayStr(),
       makerDate:mk?mk.value||null:null,
+      birthday:bd?bd.value||null:null,
       lectures:lecs,logs:[]
     });
     saveToSheet(people[0]);
@@ -500,6 +520,83 @@ function openFlagMgr(onClose){
 }
 
 
+
+function renderChips(){
+  var strip=document.getElementById('chip-strip');
+  if(!strip)return;
+
+  var rc=people.filter(function(p){return p.reminder}).length;
+  var bc=people.filter(function(p){
+    if(!p.birthday)return false;
+    var now=new Date();var parts=p.birthday.split('-');
+    var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+    if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
+    return (next-now)/86400000<=30;
+  }).length;
+
+  var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
+  var nac=people.filter(function(p){return p.flags.includes('アプローチしない')}).length;
+
+  function chip(f,label,dot){
+    var active=curFilter===f?' active':'';
+    var dotHtml=dot?'<span class="cdot" style="background:'+dot+'"></span>':'';
+    return '<div class="chip'+active+'" data-f="'+f+'">'+dotHtml+'<span>'+label+'</span></div>';
+  }
+
+  var html='';
+  html+='<button id="btn-flag-mgr" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">＋</button>';
+  html+=chip('all','すべて','');
+  html+=chip('reminder','リマインドあり ('+rc+')','#C8472B');
+  html+=chip('birthday','🎂 誕生日近い ('+bc+')','');
+  html+=chip('random','🎲 ランダム','');
+  customFlags.forEach(function(f){
+    var cnt=people.filter(function(p){return p.flags.includes(f)}).length;
+    html+=chip(f,f+' ('+cnt+')','');
+  });
+  if(nac>0)html+=chip('noapproach','アプローチしない ('+nac+')','');
+
+  strip.innerHTML=html;
+
+  // イベント再バインド
+  strip.querySelectorAll('.chip').forEach(function(el){
+    el.onclick=function(){
+      curFilter=el.dataset.f;
+      renderChips();
+      renderList();
+    };
+  });
+  var mgr=document.getElementById('btn-flag-mgr');
+  if(mgr)mgr.onclick=function(){openFlagMgr(function(){render();})};
+}
+
+function renderList(){
+  var list=getList();
+  document.getElementById('filter-count').textContent=list.length!==people.length?'表示中 '+list.length+'人':'';
+  var wrap=document.getElementById('list-wrap');
+  if(list.length===0){wrap.innerHTML='<div class="empty">該当する人がいません</div>';return}
+  var html='';
+  if(curFilter==='reminder'){
+    var over=list.filter(function(p){return ddiff(p.reminder)<0});
+    var soon=list.filter(function(p){var d=ddiff(p.reminder);return d!==null&&d>=0&&d<=2});
+    var up=list.filter(function(p){return ddiff(p.reminder)>2});
+    if(over.length){html+='<div class="slabel">⚠️ 期限切れ</div>';over.forEach(function(p){html+=cHTML(p)})}
+    if(soon.length){html+='<div class="slabel">🔴 今すぐ</div>';soon.forEach(function(p){html+=cHTML(p)})}
+    if(up.length){html+='<div class="slabel">近日中</div>';up.forEach(function(p){html+=cHTML(p)})}
+  } else if(curFilter==='birthday'){
+    html+='<div class="slabel">🎂 誕生日が近い人</div>';
+    list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='random'){
+    html+='<div class="slabel">🎲 ランダム</div>';
+    list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='noapproach'){
+    html+='<div class="slabel">アプローチしない</div>';
+    list.forEach(function(p){html+=cHTML(p)});
+  } else {
+    list.forEach(function(p){html+=cHTML(p)});
+  }
+  wrap.innerHTML=html;
+}
+
 function closeSheet(){
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').classList.remove('open');
@@ -516,13 +613,7 @@ document.getElementById('btn-add').onclick=openAdd;
 var btnFlagMgr=document.getElementById('btn-flag-mgr');
 if(btnFlagMgr)btnFlagMgr.onclick=function(){openFlagMgr(function(){render();})};
 document.getElementById('overlay').onclick=closeSheet;
-document.querySelectorAll('.chip').forEach(function(el){
-  el.onclick=function(){
-    curFilter=el.dataset.f;
-    document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('active')});
-    el.classList.add('active');render();
-  };
-});
+// チップはrenderChips()で動的生成
 document.querySelectorAll('.tab').forEach(function(el){
   el.onclick=function(){
     curCat=el.dataset.c;
