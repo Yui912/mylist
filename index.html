@@ -123,6 +123,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     <div id="owner-label" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="font-size:11px;color:var(--ink3)" id="filter-count"></div>
+      <button id="btn-search" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">🔍</button>
       <button class="hadd" id="btn-add">＋</button>
     </div>
   </div>
@@ -194,29 +195,27 @@ function getList(){
   var list=people.slice();
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
   if(curFilter!=='all')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
-  if(curFilter==='reminder'){list=list.filter(function(p){return p.reminder}).sort(function(a,b){return new Date(a.reminder)-new Date(b.reminder)})}
-  else if(curFilter==='birthday'){
-    var now=new Date();
-    list=list.filter(function(p){
-      if(!p.birthday)return false;
-      var parts=p.birthday.split('-');
+  if(curFilter==='reminder'){
+    list=list.filter(function(p){return p.reminder}).sort(function(a,b){return new Date(a.reminder)-new Date(b.reminder)});
+  } else if(curFilter==='birthday'){
+    function bdDaysUntil(bd){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=bd.split('-');
       var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
       if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
-      return (next-now)/86400000<=30;
-    }).sort(function(a,b){
-      function daysUntil(bd){
-        var now=new Date();var parts=bd.split('-');
-        var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-        if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
-        return (next-now)/86400000;
-      }
-      return daysUntil(a.birthday)-daysUntil(b.birthday);
-    });
-  }
-  else if(curFilter==='random'){list=list.sort(function(){return Math.random()-.5}).slice(0,5)}
-  else if(curFilter==='noapproach'){list=list.filter(function(p){return p.flags.includes('アプローチしない')})}
-  else {
-    // カスタムフラグフィルタ
+      return Math.round((next-now)/86400000);
+    }
+    list=list.filter(function(p){
+      if(!p.birthday)return false;
+      var d=bdDaysUntil(p.birthday);
+      return d>=-1&&d<=30;
+    }).sort(function(a,b){return bdDaysUntil(a.birthday)-bdDaysUntil(b.birthday)});
+  } else if(curFilter==='random'){
+    // シャッフルして全員表示
+    for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t;}
+  } else if(curFilter==='noapproach'){
+    list=list.filter(function(p){return p.flags.includes('アプローチしない')});
+  } else {
     var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
     if(customFlags.includes(curFilter)){
       list=list.filter(function(p){return p.flags.includes(curFilter)});
@@ -246,8 +245,36 @@ function render(){
     if(soon.length){html+='<div class="slabel">🔴 今すぐ</div>';soon.forEach(function(p){html+=cHTML(p)})}
     if(up.length){html+='<div class="slabel">近日中</div>';up.forEach(function(p){html+=cHTML(p)})}
   } else if(curFilter==='birthday'){
-    html+='<div class="slabel">🎂 誕生日が近い人</div>';
-    list.forEach(function(p){html+=cHTML(p)});
+    var todayBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      return Math.round((next-now)/86400000)===0;
+    });
+    var yesterdayBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      return Math.round((next-now)/86400000)===-1;
+    });
+    var tomorrowBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      return Math.round((next-now)/86400000)===1;
+    });
+    var restBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      var d=Math.round((next-now)/86400000);
+      return d>1&&d<=30;
+    });
+    if(todayBD.length){html+='<div class="slabel">🎂 今日</div>';todayBD.forEach(function(p){html+=cHTML(p)})}
+    if(yesterdayBD.length){html+='<div class="slabel">昨日</div>';yesterdayBD.forEach(function(p){html+=cHTML(p)})}
+    if(tomorrowBD.length){html+='<div class="slabel">明日</div>';tomorrowBD.forEach(function(p){html+=cHTML(p)})}
+    if(restBD.length){html+='<div class="slabel">近い人</div>';restBD.forEach(function(p){html+=cHTML(p)})}
+    if(!list.length){html='<div class="empty">30日以内に誕生日の人はいません</div>'}
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
     list.forEach(function(p){html+=cHTML(p)});
@@ -288,7 +315,9 @@ function dHTML(p){
     return '<div><div class="llabel">'+l+'</div>'
       +'<input class="efield" type="date" data-lec="'+l+'" value="'+(p.lectures[l]?p.lectures[l].replace(/\//g,'-'):'')+'" style="padding:8px 10px;font-size:13px"></div>';
   }).join('');
-  var fb=allFlags.map(function(f){
+  var customFlagsD=allFlags.filter(function(f){return f!=='アプローチしない'});
+  var orderedFlags=customFlagsD.concat(allFlags.includes('アプローチしない')?['アプローチしない']:[]);
+  var fb=orderedFlags.map(function(f){
     var on=p.flags.includes(f);
     return '<button class="fbtn'+(on?' on':'')+'" data-flag="'+f+'">'+(on?'✓ ':'')+f+'</button>';
   }).join('');
@@ -583,8 +612,36 @@ function renderList(){
     if(soon.length){html+='<div class="slabel">🔴 今すぐ</div>';soon.forEach(function(p){html+=cHTML(p)})}
     if(up.length){html+='<div class="slabel">近日中</div>';up.forEach(function(p){html+=cHTML(p)})}
   } else if(curFilter==='birthday'){
-    html+='<div class="slabel">🎂 誕生日が近い人</div>';
-    list.forEach(function(p){html+=cHTML(p)});
+    var todayBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      return Math.round((next-now)/86400000)===0;
+    });
+    var yesterdayBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      return Math.round((next-now)/86400000)===-1;
+    });
+    var tomorrowBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      return Math.round((next-now)/86400000)===1;
+    });
+    var restBD=list.filter(function(p){
+      var now=new Date();now.setHours(0,0,0,0);
+      var parts=p.birthday.split('-');
+      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      var d=Math.round((next-now)/86400000);
+      return d>1&&d<=30;
+    });
+    if(todayBD.length){html+='<div class="slabel">🎂 今日</div>';todayBD.forEach(function(p){html+=cHTML(p)})}
+    if(yesterdayBD.length){html+='<div class="slabel">昨日</div>';yesterdayBD.forEach(function(p){html+=cHTML(p)})}
+    if(tomorrowBD.length){html+='<div class="slabel">明日</div>';tomorrowBD.forEach(function(p){html+=cHTML(p)})}
+    if(restBD.length){html+='<div class="slabel">近い人</div>';restBD.forEach(function(p){html+=cHTML(p)})}
+    if(!list.length){html='<div class="empty">30日以内に誕生日の人はいません</div>'}
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
     list.forEach(function(p){html+=cHTML(p)});
@@ -595,6 +652,36 @@ function renderList(){
     list.forEach(function(p){html+=cHTML(p)});
   }
   wrap.innerHTML=html;
+}
+
+
+function openSearch(){
+  showSheet(
+    '<div class="shdr">'
+    +'<div style="flex:1"><input class="efield" id="search-input" placeholder="名前で検索…" style="font-size:16px;padding:8px 12px" autofocus></div>'
+    +'<button class="sclose" id="btn-close">✕</button>'
+    +'</div>'
+    +'<div class="ssec" id="search-results"><div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px">名前を入力してください</div></div>'
+  );
+  document.getElementById('btn-close').onclick=closeSheet;
+  var inp=document.getElementById('search-input');
+  if(inp){
+    inp.focus();
+    inp.addEventListener('input',function(){
+      var q=inp.value.trim();
+      var res=document.getElementById('search-results');
+      if(!q){res.innerHTML='<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px">名前を入力してください</div>';return;}
+      var hits=people.filter(function(p){return p.name.indexOf(q)!==-1});
+      if(!hits.length){res.innerHTML='<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px">該当する人がいません</div>';return;}
+      res.innerHTML=hits.map(function(p){
+        var sb=p.status==='abo'?'<span class="badge babo">ABO</span>':p.status==='pc'?'<span class="badge bpc">PC</span>':'<span class="badge bnone">未登録</span>';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="closeSheet();openDetail('+p.id+')">'
+          +'<div><div style="font-size:15px;font-weight:600">'+p.name+'</div>'
+          +(p.memo?'<div style="font-size:11px;color:var(--ink3);margin-top:2px">'+p.memo+'</div>':'')
+          +'</div>'+sb+'</div>';
+      }).join('');
+    });
+  }
 }
 
 function closeSheet(){
@@ -614,6 +701,7 @@ var btnFlagMgr=document.getElementById('btn-flag-mgr');
 if(btnFlagMgr)btnFlagMgr.onclick=function(){openFlagMgr(function(){render();})};
 document.getElementById('overlay').onclick=closeSheet;
 // チップはrenderChips()で動的生成
+document.getElementById('btn-search').onclick=openSearch;
 document.querySelectorAll('.tab').forEach(function(el){
   el.onclick=function(){
     curCat=el.dataset.c;
