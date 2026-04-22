@@ -156,40 +156,32 @@ var curFilter = 'all';
 var curCat = 'all';
 var curP = null;
 
-var people = [
-  {id:1,name:'石橋美穂',memo:'みさき経由。占い好き。',status:'none',flags:[],
-   reminder:'2026-04-25',lastContact:'2026-04-10',makerDate:'2025-06-29',
-   lectures:{'洗剤':'2025/06/29','化粧品':'2025/07/03','サプリ':'2025/06/29','水・空気':'2025/07/03','鍋':null},
-   logs:[{date:'06/29',text:'全デモ＆サプリ @みさき宅→QA松下宅'},{date:'06/07',text:'占い＆相談 @松下さん宅'},{date:'05/22',text:'占い @みさき宅'}]},
-  {id:2,name:'田中ゆーな',memo:'',status:'none',flags:['要フォロー'],
-   reminder:'2026-04-23',lastContact:'2026-03-20',makerDate:'2025-09-15',
-   lectures:{'洗剤':null,'化粧品':null,'サプリ':'2025/09/15','水・空気':null,'鍋':null},
-   logs:[{date:'03/20',text:'まっちつなぐかも、なぞにプロレスきそう'}]},
-  {id:3,name:'長瀬さん',memo:'',status:'none',flags:[],
-   reminder:null,lastContact:'2026-02-01',makerDate:null,
-   lectures:{'洗剤':null,'化粧品':null,'サプリ':null,'水・空気':null,'鍋':null},
-   logs:[{date:'02/01',text:'半月以降かな'}]},
-  {id:4,name:'有花',memo:'ヨガ仲間。健康意識高め。',status:'pc',flags:[],
-   reminder:'2026-05-01',lastContact:'2026-04-15',makerDate:'2025-03-20',
-   lectures:{'洗剤':'2025/03/20','化粧品':'2025/03/20','サプリ':null,'水・空気':null,'鍋':null},
-   logs:[{date:'04/15',text:'ロンジェビティやりすぎ？でも次への一歩の想いこめて'},{date:'03/20',text:'21-でもびみょかったら返品して割り引いてあげるからマジで教えてほしい'}]},
-  {id:5,name:'ミヤビ',memo:'',status:'none',flags:['アプローチしない'],
-   reminder:null,lastContact:'2026-03-22',makerDate:'2026-03-22',
-   lectures:{'洗剤':'2026/03/22','化粧品':null,'サプリ':null,'水・空気':null,'鍋':'2026/03/22'},
-   logs:[{date:'03/22',text:'バンデモ！鍋ワンチャン、値上げも言う'}]},
-  {id:6,name:'ミナ',memo:'',status:'none',flags:[],
-   reminder:'2026-04-26',lastContact:'2026-03-22',makerDate:'2026-03-22',
-   lectures:{'洗剤':'2026/03/22','化粧品':null,'サプリ':null,'水・空気':null,'鍋':null},
-   logs:[{date:'03/22',text:'Amwayは言う 4/16 ウィーンフィルくるから先チケットでもらお'}]},
-  {id:7,name:'静香',memo:'',status:'pc',flags:[],
-   reminder:null,lastContact:'2026-04-01',makerDate:'2025-11-10',
-   lectures:{'洗剤':'2025/11/10','化粧品':'2025/11/10','サプリ':'2026/01/15','水・空気':null,'鍋':null},
-   logs:[{date:'04/01',text:'朝かな、またセッション行く'}]},
-  {id:8,name:'しのくん',memo:'',status:'none',flags:[],
-   reminder:null,lastContact:'2026-01-10',makerDate:null,
-   lectures:{'洗剤':null,'化粧品':null,'サプリ':null,'水・空気':null,'鍋':null},
-   logs:[{date:'01/10',text:'クッキー作ったら突如会えそう'}]}
-];
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbw2EBflnMw7aNdMShBe1SrjaaWC8m0_Toe0b5L6SmfWOOfe7JDYqCNmyWf6Jjo366MR/exec';
+var people = [];
+var isLoading = false;
+
+function loadFromSheet(){
+  isLoading = true;
+  document.getElementById('list-wrap').innerHTML = '<div class="empty">読み込み中…</div>';
+  fetch(GAS_URL + '?action=getAll')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.people) people = data.people;
+      isLoading = false;
+      render();
+    })
+    .catch(function(e){
+      isLoading = false;
+      document.getElementById('list-wrap').innerHTML = '<div class="empty">読み込みエラー。再読み込みしてください。</div>';
+    });
+}
+
+function saveToSheet(person){
+  fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'save', person: person })
+  }).catch(function(e){ console.error('save error', e); });
+}
 
 function todayStr(){return new Date().toISOString().split('T')[0]}
 function ddiff(d){if(!d)return null;return Math.round((new Date(d)-new Date())/86400000)}
@@ -322,6 +314,7 @@ function bindDetail(){
       p.lectures[el.dataset.lec]=el.value?el.value.replace(/-/g,'/'):null;
     });
     render();toast('保存済み ✓');
+    saveToSheet(p);
   }
 
   var fn=document.getElementById('f-name');if(fn)fn.addEventListener('input',save);
@@ -335,6 +328,7 @@ function bindDetail(){
       p.status=btn.dataset.s;
       document.querySelectorAll('[data-s]').forEach(function(b){b.className='sbtn'+(b.dataset.s===p.status?' s'+p.status:'')});
       render();toast('保存済み ✓');
+      saveToSheet(p);
     };
   });
 
@@ -347,6 +341,7 @@ function bindDetail(){
         btn.className='fbtn'+(p.flags.includes(f)?' on':'');
         btn.textContent=(p.flags.includes(f)?'✓ ':'')+f;
         render();toast('保存済み ✓');
+        saveToSheet(p);
       };
     });
     var fadd=document.getElementById('btn-fadd');
@@ -432,6 +427,7 @@ function openAdd(){
       makerDate:mk?mk.value||null:null,
       lectures:lecs,logs:[]
     });
+    saveToSheet(people[0]);
     closeSheet();render();toast(name+' を追加しました ✓');
   };
 }
@@ -551,7 +547,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-render();
+loadFromSheet();
 </script>
 </body>
 </html>
