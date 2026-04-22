@@ -517,9 +517,14 @@ function showSheet(html){
 function openFlagMgr(onClose){
   function refresh(){
     var listHTML = allFlags.map(function(f, i){
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">'
-        +'<span style="font-size:15px">'+f+'</span>'
-        +'<button class="fmgr-del" data-idx="'+i+'" style="background:none;border:none;color:var(--ink3);font-size:22px;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+      if(f==='アプローチしない'){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border)">'
+          +'<span style="flex:1;font-size:14px;color:var(--ink3);padding:7px 10px">'+f+'（変更不可）</span>'
+          +'</div>';
+      }
+      return '<div style="display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border)">'
+        +'<input class="efield fmgr-edit" data-idx="'+i+'" value="'+f+'" style="flex:1;font-size:14px;padding:7px 10px">'
+        +'<button class="fmgr-del" data-idx="'+i+'" style="background:none;border:none;color:var(--ink3);font-size:22px;cursor:pointer;padding:4px 8px;line-height:1;flex-shrink:0">×</button>'
         +'</div>';
     }).join('') || '<div style="color:var(--ink3);font-size:13px;padding:8px 0">まだフラグがありません</div>';
 
