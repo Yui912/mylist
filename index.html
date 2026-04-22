@@ -22,7 +22,7 @@
   --border:#E2DDD8; --shadow:0 2px 12px rgba(0,0,0,0.07); --radius:16px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;max-width:430px;margin:0 auto}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
 
 .header{background:var(--surface);padding:20px 20px 0;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
@@ -69,8 +69,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;backdrop-filter:blur(2px)}
 .overlay.open{display:block}
-.sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:430px;background:var(--surface);border-radius:24px 24px 0 0;z-index:400;max-height:90vh;overflow-y:auto;padding-bottom:40px;transition:transform .3s cubic-bezier(.32,.72,0,1)}
-.sheet.open{transform:translateX(-50%) translateY(0)}
+.sheet{position:fixed;bottom:0;left:0;right:0;transform:translateY(100%);width:100%;background:var(--surface);border-radius:24px 24px 0 0;z-index:400;max-height:90vh;overflow-y:auto;padding-bottom:40px;transition:transform .3s cubic-bezier(.32,.72,0,1)}
+.sheet.open{transform:translateY(0)}
 .shandle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 20px}
 .shdr{padding:0 20px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start}
 .sclose{width:32px;height:32px;border-radius:50%;background:var(--surface2);border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink2);flex-shrink:0;margin-left:10px}
@@ -123,8 +123,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     <div id="owner-label" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="font-size:11px;color:var(--ink3)" id="filter-count"></div>
-      <button id="btn-search" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">🔍</button>
-      <button class="hadd" id="btn-add">＋</button>
+      <button id="btn-search" style="height:32px;padding:0 12px;border-radius:16px;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">名前で検索🔍</button>
+      <button class="hadd" id="btn-add" style="width:auto;padding:0 12px;border-radius:16px;font-size:12px;font-weight:700;white-space:nowrap">List＋</button>
     </div>
   </div>
   <div class="chip-strip" id="chip-strip">
@@ -345,7 +345,8 @@ function dHTML(p){
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
     +'<div class="ssec"><div class="ssec-title">コミュニケーション履歴</div>'
     +'<div class="larow"><input class="linput" id="f-log" placeholder="今日の内容…"><button class="lsubmit" id="btn-ladd">追加</button></div>'
-    +'<div id="log-list">'+li+'</div></div>';
+    +'<div id="log-list">'+li+'</div></div>'
+    +'<div class="ssec"><button id="btn-delete" style="width:100%;padding:13px;background:white;color:#C8472B;border:1.5px solid #C8472B;border-radius:12px;font-size:14px;font-weight:700;font-family:sans-serif;cursor:pointer">この人を削除する</button></div>';
 }
 
 function bindDetail(){
@@ -415,6 +416,14 @@ function bindDetail(){
   }
   bindFlags();
 
+  var bdel=document.getElementById('btn-delete');
+  if(bdel)bdel.onclick=function(){
+    if(!confirm('本当に削除する？'))return;
+    people=people.filter(function(x){return x.id!==p.id});
+    fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'delete',id:p.id})})
+      .catch(function(e){console.error('delete error',e)});
+    closeSheet();render();toast(p.name+' を削除しました');
+  };
   var ladd=document.getElementById('btn-ladd');
   if(ladd)ladd.onclick=function(){
     var inp=document.getElementById('f-log');
