@@ -95,10 +95,16 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 .linput{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:var(--ink);outline:none}
 .linput:focus{border-color:var(--accent);background:white}
 .lsubmit{padding:9px 14px;background:var(--ink);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;white-space:nowrap}
-.litem{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.litem{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start}
 .litem:last-child{border-bottom:none}
-.ldate{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink3);white-space:nowrap;min-width:50px;padding-top:1px}
-.ltext{font-size:13px;color:var(--ink2);line-height:1.5}
+.litem.selected{background:var(--surface2);margin:0 -20px;padding:10px 20px;border-radius:0}
+.lchk{width:18px;height:18px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:var(--accent)}
+.ldate{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink3);white-space:nowrap;min-width:44px;padding-top:2px}
+.ltext{font-size:13px;color:var(--ink2);line-height:1.6;flex:1;white-space:pre-wrap;word-break:break-all}
+.ledit-btn{background:none;border:none;font-size:14px;color:var(--ink3);cursor:pointer;padding:0 4px;flex-shrink:0}
+.log-edit-area{width:100%;font-size:13px;border:1.5px solid var(--accent);border-radius:8px;padding:6px 8px;resize:none;line-height:1.6;font-family:inherit;background:var(--surface);color:var(--ink)}
+.larow{display:flex;gap:8px;margin-bottom:8px;align-items:flex-end}
+.log-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .savebtn{width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer}
 .savebtn:active{opacity:.85}
 .empty{text-align:center;padding:60px 20px;color:var(--ink3);font-size:14px}
@@ -114,16 +120,18 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
   <button class="pw-btn" onclick="checkPW()">入る</button>
 </div>
 
+<div id="main-view">
 <div class="header">
   <div class="header-top">
     <div style="display:flex;align-items:center;gap:8px">
+      <button id="btn-menu" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">≡</button>
       <div class="header-title">My List</div>
       <div class="hcount" id="total-count">0人</div>
     </div>
     <div id="owner-label" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="font-size:11px;color:var(--ink3)" id="filter-count"></div>
-      <button id="btn-search" style="height:32px;padding:0 12px;border-radius:16px;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">名前で検索🔍</button>
+      <button id="btn-search" style="height:32px;padding:0 12px;border-radius:16px;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">名前🔍</button>
       <button class="hadd" id="btn-add" style="width:auto;padding:0 12px;border-radius:16px;font-size:12px;font-weight:700;white-space:nowrap">List＋</button>
     </div>
   </div>
@@ -145,13 +153,16 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
   <div class="shandle"></div>
   <div id="sheet-body"></div>
 </div>
+</div>
+<div id="map-view" style="display:none;position:fixed;inset:0;z-index:200;overflow-y:auto;background:var(--bg)"></div>
 
 <script>
 var LECS = ['洗剤','化粧品','サプリ','水・空気','鍋'];
-var allFlags = ['アプローチしない'];
+var allFlags = ['直以外', 'アプローチしない', '独立'];
 var curFilter = 'all';
 var curCat = 'all';
 var curP = null;
+var mapLocked = false;
 
 // URLパラメータからownerを取得
 var urlParams = new URLSearchParams(window.location.search);
@@ -173,7 +184,7 @@ function loadFromSheet(){
         people.forEach(function(p){
           if(p.flags && p.flags.length){
             p.flags.forEach(function(f){
-              if(f !== 'アプローチしない' && !allFlags.includes(f)){
+              if(f !== 'アプローチしない' && f !== '直以外' && f !== '独立' && !allFlags.includes(f)){
                 allFlags.push(f);
               }
             });
@@ -203,6 +214,14 @@ function dsince(d){if(!d)return 9999;return Math.round((new Date()-new Date(d))/
 function fmtD(d){if(!d)return null;var dt=new Date(d);return (dt.getMonth()+1)+'/'+dt.getDate()}
 function nextId(){return Math.max.apply(null,[0].concat(people.map(function(p){return p.id})))+1}
 
+function bdDaysUntil(bd){
+  var now=new Date();now.setHours(0,0,0,0);
+  var parts=bd.split('-');
+  var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+  if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
+  return Math.round((next-now)/86400000);
+}
+
 function getList(){
   var list=people.slice();
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
@@ -210,13 +229,6 @@ function getList(){
   if(curFilter==='reminder'){
     list=list.filter(function(p){return p.reminder}).sort(function(a,b){return new Date(a.reminder)-new Date(b.reminder)});
   } else if(curFilter==='birthday'){
-    function bdDaysUntil(bd){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=bd.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      if(next<now)next=new Date(now.getFullYear()+1,parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000);
-    }
     list=list.filter(function(p){
       if(!p.birthday)return false;
       var d=bdDaysUntil(p.birthday);
@@ -225,10 +237,12 @@ function getList(){
   } else if(curFilter==='random'){
     // シャッフルして全員表示
     for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t;}
+  } else if(curFilter==='independent'){
+    list=list.filter(function(p){return p.flags.includes('独立')});
   } else if(curFilter==='noapproach'){
     list=list.filter(function(p){return p.flags.includes('アプローチしない')});
   } else {
-    var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
+    var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'&&f!=='独立'&&f!=='直以外'});
     if(customFlags.includes(curFilter)){
       list=list.filter(function(p){return p.flags.includes(curFilter)});
     }
@@ -290,6 +304,9 @@ function render(){
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
     list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='independent'){
+    html+='<div class="slabel">独立</div>';
+    list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='noapproach'){
     html+='<div class="slabel">アプローチしない</div>';
     list.forEach(function(p){html+=cHTML(p)});
@@ -332,6 +349,19 @@ function openDetail(id){
   bindDetail();
 }
 
+
+function renderLogsHTML(logs){
+  if(!logs||!logs.length) return '<div style="color:var(--ink3);font-size:13px;padding:8px">まだ記録がありません</div>';
+  return logs.map(function(l,i){
+    return '<div class="litem" data-idx="'+i+'">'
+      +'<input type="checkbox" class="lchk" data-idx="'+i+'">'
+      +'<div class="ldate">'+l.date+'</div>'
+      +'<div class="ltext">'+l.text+'</div>'
+      +'<button class="ledit-btn" data-idx="'+i+'" title="編集">✏️</button>'
+      +'</div>';
+  }).join('');
+}
+
 function dHTML(p){
   var lg=LECS.map(function(l){
     return '<div><div class="llabel">'+l+'</div>'
@@ -343,7 +373,7 @@ function dHTML(p){
     var on=p.flags.includes(f);
     return '<button class="fbtn'+(on?' on':'')+'" data-flag="'+f+'">'+(on?'✓ ':'')+f+'</button>';
   }).join('');
-  var li=p.logs.map(function(l){return '<div class="litem"><div class="ldate">'+l.date+'</div><div class="ltext">'+l.text+'</div></div>'}).join('')||'<div style="color:var(--ink3);font-size:13px;padding:8px">まだ記録がありません</div>';
+  var li=renderLogsHTML(p.logs);
   var ss=function(s){return p.status===s?' s'+s:''};
   return '<div class="shdr">'
     +'<div style="flex:1">'
@@ -357,16 +387,33 @@ function dHTML(p){
     +'<button class="sbtn'+ss('abo')+'" data-s="abo">ABO</button>'
     +'</div></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div>'
-    +'<input class="efield" type="date" id="f-reminder" value="'+(p.reminder||'')+'"></div>'
-    +'<div class="erow"><div class="elabel">📣 マーケ日</div>'
-    +'<input class="efield" type="date" id="f-maker" value="'+(p.makerDate?p.makerDate.replace(/\//g,'-'):'')+'"></div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-reminder" value="'+(p.reminder||'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-reminder" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
+    +'<div class="erow"><div class="elabel">📣 マケ日</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-maker" value="'+(p.makerDate?p.makerDate.replace(/\//g,'-'):'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-maker" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
     +'<div class="erow"><div class="elabel">🎂 誕生日</div>'
-    +'<input class="efield" type="date" id="f-birthday" value="'+(p.birthday||'')+'"></div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-birthday" value="'+(p.birthday||'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-birthday" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
     +'<div class="erow"><div class="elabel">フラグ</div>'
     +'<div class="fwrap" id="fwrap">'+fb+'<button class="fadd" id="btn-fadd">＋</button></div></div></div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
     +'<div class="ssec"><div class="ssec-title">コミュニケーション履歴</div>'
-    +'<div class="larow"><input class="linput" id="f-log" placeholder="今日の内容…"><button class="lsubmit" id="btn-ladd">追加</button></div>'
+    +'<div class="larow">'
+    +'<input class="efield" type="date" id="f-log-date" value="'+new Date().toISOString().split('T')[0]+'" style="width:130px;flex-shrink:0;font-size:12px;padding:6px 8px">'
+    +'<input class="linput" id="f-log" placeholder="内容を入力…" style="flex:1">'
+    +'<button class="lsubmit" id="btn-ladd">追加</button>'
+    +'</div>'
+    +'<div class="log-toolbar">'
+    +'<span id="log-sel-count" style="font-size:12px;color:var(--ink3)"></span>'
+    +'<button id="btn-log-del" style="display:none;font-size:12px;color:#C8472B;background:none;border:none;cursor:pointer;font-weight:700">選択削除</button>'
+    +'</div>'
     +'<div id="log-list">'+li+'</div></div>'
     +'<div class="ssec"><button id="btn-delete" style="width:100%;padding:13px;background:white;color:#C8472B;border:1.5px solid #C8472B;border-radius:12px;font-size:14px;font-weight:700;font-family:sans-serif;cursor:pointer">この人を削除する</button></div>';
 }
@@ -393,6 +440,12 @@ function bindDetail(){
     saveToSheet(p);
   }
 
+  document.querySelectorAll('.clr-btn').forEach(function(btn){
+    btn.onclick=function(){
+      var el=document.getElementById(btn.dataset.target);
+      if(el){ el.value=''; save(); }
+    };
+  });
   var fn=document.getElementById('f-name');if(fn)fn.addEventListener('input',save);
   var fm=document.getElementById('f-memo');if(fm)fm.addEventListener('input',save);
   var fr=document.getElementById('f-reminder');if(fr)fr.addEventListener('change',save);
@@ -446,17 +499,84 @@ function bindDetail(){
       .catch(function(e){console.error('delete error',e)});
     closeSheet();render();toast(p.name+' を削除しました');
   };
-  var ladd=document.getElementById('btn-ladd');
-  if(ladd)ladd.onclick=function(){
-    var inp=document.getElementById('f-log');
-    var text=inp.value.trim();if(!text)return;
-    var now=new Date();
-    p.logs.unshift({date:(now.getMonth()+1)+'/'+now.getDate(),text:text});
-    inp.value='';
-    document.getElementById('log-list').innerHTML=p.logs.map(function(l){
-      return '<div class="litem"><div class="ldate">'+l.date+'</div><div class="ltext">'+l.text+'</div></div>';
-    }).join('');
+  // ログ関連
+  var logList = document.getElementById('log-list');
+  var selCount = document.getElementById('log-sel-count');
+  var delBtn = document.getElementById('btn-log-del');
+
+  function refreshLogs(){
+    if(logList) logList.innerHTML = renderLogsHTML(p.logs);
+  }
+
+  if(logList){
+    logList.onclick = function(e){
+      var t = e.target;
+      if(t.classList.contains('ledit-btn') && !t.classList.contains('log-save-btn') && !t.classList.contains('log-cancel-btn')){
+        var i = parseInt(t.dataset.idx);
+        var item = logList.querySelector('.litem[data-idx="'+i+'"]');
+        var log = p.logs[i];
+        var yr = new Date().getFullYear();
+        var pts = log.date.split('/');
+        var dateVal = yr+'-'+('0'+pts[0]).slice(-2)+'-'+('0'+pts[1]).slice(-2);
+        item.innerHTML =
+          '<input type="date" class="efield log-edit-date" value="'+dateVal+'" style="width:130px;flex-shrink:0;font-size:12px;padding:5px 6px">'
+          +'<textarea class="log-edit-area" rows="2" style="flex:1;font-size:13px;border:1.5px solid var(--accent);border-radius:8px;padding:6px;resize:none;font-family:inherit">'+log.text+'</textarea>'
+          +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
+          +'<button class="ledit-btn log-save-btn" data-idx="'+i+'">💾</button>'
+          +'<button class="ledit-btn log-cancel-btn" data-idx="'+i+'">✕</button>'
+          +'</div>';
+      } else if(t.classList.contains('log-save-btn')){
+        var i = parseInt(t.dataset.idx);
+        var item = logList.querySelector('.litem[data-idx="'+i+'"]');
+        var nd = item.querySelector('.log-edit-date').value;
+        var dd = new Date(nd);
+        var ds = (dd.getMonth()+1)+'/'+dd.getDate();
+        var nt = item.querySelector('.log-edit-area').value.trim();
+        if(!nt) return;
+        p.logs[i] = {date:ds, text:nt};
+        saveToSheet(p);
+        refreshLogs();
+        toast('更新しました ✓');
+      } else if(t.classList.contains('log-cancel-btn')){
+        refreshLogs();
+      }
+    };
+    logList.onchange = function(e){
+      if(e.target.classList.contains('lchk')){
+        var sel = logList.querySelectorAll('.lchk:checked').length;
+        if(selCount) selCount.textContent = sel ? sel+'件選択中' : '';
+        if(delBtn) delBtn.style.display = sel ? 'inline-block' : 'none';
+      }
+    };
+  }
+
+  var ladd = document.getElementById('btn-ladd');
+  if(ladd) ladd.onclick = function(){
+    var inp = document.getElementById('f-log');
+    var di = document.getElementById('f-log-date');
+    var text = inp.value.trim();
+    if(!text) return;
+    var d = di && di.value ? new Date(di.value) : new Date();
+    var ds = (d.getMonth()+1)+'/'+d.getDate();
+    p.logs.unshift({date:ds, text:text});
+    inp.value = '';
+    if(logList) logList.innerHTML = renderLogsHTML(p.logs);
+    saveToSheet(p);
     toast('追加しました ✓');
+  };
+
+  if(delBtn) delBtn.onclick = function(){
+    var checked = logList ? logList.querySelectorAll('.lchk:checked') : [];
+    var idxs = [];
+    checked.forEach(function(c){ idxs.push(parseInt(c.dataset.idx)); });
+    if(!idxs.length) return;
+    if(!confirm(idxs.length+'件の履歴を削除しますか？')) return;
+    idxs.sort(function(a,b){ return b-a; }).forEach(function(i){ p.logs.splice(i,1); });
+    saveToSheet(p);
+    refreshLogs();
+    if(selCount) selCount.textContent = '';
+    if(delBtn) delBtn.style.display = 'none';
+    toast(idxs.length+'件削除しました');
   };
 }
 
@@ -478,8 +598,10 @@ function openAdd(){
     +'<button class="sbtn" data-s="abo">ABO</button>'
     +'</div></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="f-reminder"></div>'
-    +'<div class="erow"><div class="elabel">📣 マーケ日</div><input class="efield" type="date" id="f-maker"></div>'
+    +'<div class="erow"><div class="elabel">📣 マケ日</div><input class="efield" type="date" id="f-maker"></div>'
     +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="f-birthday"></div>'
+    +'<div class="erow"><div class="elabel">フラグ</div>'
+    +'<div class="fwrap" id="add-fwrap">'+allFlags.map(function(f){return '<button class="fbtn" data-flag="'+f+'">'+f+'</button>';}).join('')+'<button class="fadd" id="add-fadd">＋</button></div></div>'
     +'</div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
     +'<div class="ssec"><button class="savebtn" id="btn-save">追加する</button></div>'
@@ -529,7 +651,7 @@ function showSheet(html){
 function openFlagMgr(onClose){
   function refresh(){
     var listHTML = allFlags.map(function(f, i){
-      if(f==='アプローチしない'){
+      if(f==='アプローチしない'||f==='直以外'||f==='独立'){
         return '<div style="display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border)">'
           +'<span style="flex:1;font-size:14px;color:var(--ink3);padding:7px 10px">'+f+'（変更不可）</span>'
           +'</div>';
@@ -599,7 +721,7 @@ function renderChips(){
     return (next-now)/86400000<=30;
   }).length;
 
-  var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
+  var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'&&f!=='独立'&&f!=='直以外'});
   var nac=people.filter(function(p){return p.flags.includes('アプローチしない')}).length;
 
   function chip(f,label,dot){
@@ -618,6 +740,8 @@ function renderChips(){
     var cnt=people.filter(function(p){return p.flags.includes(f)}).length;
     html+=chip(f,f+' ('+cnt+')','');
   });
+  var indc=people.filter(function(p){return p.flags.includes('独立')}).length;
+  if(indc>0)html+=chip('independent','独立 ('+indc+')','');
   if(nac>0)html+=chip('noapproach','アプローチしない ('+nac+')','');
 
   strip.innerHTML=html;
@@ -681,6 +805,9 @@ function renderList(){
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
     list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='independent'){
+    html+='<div class="slabel">独立</div>';
+    list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='noapproach'){
     html+='<div class="slabel">アプローチしない</div>';
     list.forEach(function(p){html+=cHTML(p)});
@@ -720,7 +847,568 @@ function openSearch(){
   }
 }
 
+
+
+function openMenu(){
+  showSheet(
+    '<div class="shdr"><div style="font-size:17px;font-weight:700">メニュー</div>'
+    +'<button class="sclose" id="btn-close">✕</button></div>'
+    +'<div class="ssec">'
+    +'<div id="menu-my-list" style="display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--border);cursor:pointer">'
+    +'<span style="font-size:22px">👥</span>'
+    +'<div><div style="font-size:15px;font-weight:600">My List</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:2px">見込み客リストを管理</div></div></div>'
+    +'<div id="menu-map" style="display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--border);cursor:pointer">'
+    +'<span style="font-size:22px">🗺</span>'
+    +'<div><div style="font-size:15px;font-weight:600">MAPアップロード</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:2px">手書きMAPを読み取ってログに反映</div></div></div>'
+    +'<div id="menu-settings" style="display:flex;align-items:center;gap:14px;padding:16px 0;cursor:pointer">'
+    +'<span style="font-size:22px">⚙️</span>'
+    +'<div><div style="font-size:15px;font-weight:600">設定</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:2px">APIキーなどの設定</div></div></div>'
+    +'</div>'
+  );
+  document.getElementById('btn-close').onclick = closeSheet;
+  document.getElementById('menu-my-list').onclick = closeSheet;
+  document.getElementById('menu-map').onclick = function(){ closeSheet(); setTimeout(openMapUpload, 300); };
+  document.getElementById('menu-settings').onclick = function(){ closeSheet(); setTimeout(openSettings, 300); };
+}
+
+
+function getApiKey(){
+  return localStorage.getItem('anthropic_api_key') || '';
+}
+
+function openSettings(){
+  var currentKey = getApiKey();
+  var maskedKey = currentKey ? currentKey.substring(0,10) + '...' + currentKey.slice(-4) : '';
+
+  showSheet(
+    '<div class="shdr"><div style="font-size:17px;font-weight:700">⚙️ 設定</div>'
+    +'<button class="sclose" id="btn-close">✕</button></div>'
+    +'<div class="ssec">'
+    +'<div class="erow">'
+    +'<div class="elabel">Anthropic APIキー</div>'
+    +'<input class="efield" type="password" id="api-key-input" placeholder="sk-ant-..." value="'+currentKey+'">'
+    +'<div style="font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.5">'
+    +'APIキーは<a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>で発行できます。<br>'
+    +'このデバイスのみに保存され、他の人には共有されません。'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="ssec">'
+    +'<button id="btn-save-key" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">保存する</button>'
+    +(currentKey ? '<button id="btn-clear-key" style="width:100%;padding:12px;background:white;color:var(--ink3);border:1.5px solid var(--border);border-radius:12px;font-size:13px;margin-top:8px;cursor:pointer">APIキーを削除する</button>' : '')
+    +'</div>'
+    +(currentKey ? '<div class="ssec"><div style="font-size:12px;color:var(--green);font-weight:600">✓ APIキー設定済み：'+maskedKey+'</div></div>' : '<div class="ssec"><div style="font-size:12px;color:var(--accent)">APIキーが未設定です。MAPアップロード機能を使うには設定してください。</div></div>')
+  );
+
+  document.getElementById('btn-close').onclick = closeSheet;
+
+  document.getElementById('btn-save-key').onclick = function(){
+    var key = document.getElementById('api-key-input').value.trim();
+    if(!key){ toast('APIキーを入力してください'); return; }
+    if(!key.startsWith('sk-ant-')){ toast('APIキーはsk-ant-から始まります'); return; }
+    localStorage.setItem('anthropic_api_key', key);
+    closeSheet();
+    toast('APIキーを保存しました ✓');
+  };
+
+  var clearBtn = document.getElementById('btn-clear-key');
+  if(clearBtn){
+    clearBtn.onclick = function(){
+      if(!confirm('APIキーを削除しますか？')) return;
+      localStorage.removeItem('anthropic_api_key');
+      closeSheet();
+      toast('APIキーを削除しました');
+    };
+  }
+}
+function openMapUpload(){
+  mapLocked = false;
+  history.pushState('', '', window.location.pathname + window.location.search + '#map');
+  document.getElementById('main-view').style.display = 'none';
+  document.getElementById('map-view').style.display = 'block';
+  renderMapUploadPage();
+}
+
+function closeMapUpload(){
+  mapLocked = false;
+  mapSelections = {};
+  try { localStorage.removeItem('map_result_cache'); localStorage.removeItem('map_selections_cache'); localStorage.removeItem('map_date_cache'); } catch(e){}
+  document.getElementById('main-view').style.display = 'block';
+  document.getElementById('map-view').style.display = 'none';
+  history.pushState('', document.title, window.location.pathname + window.location.search);
+}
+
+function renderMapUploadPage(){
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('map-view').innerHTML =
+    '<div style="background:var(--bg);min-height:100vh">'
+    +'<div style="background:var(--surface);padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">'
+    +'<button id="map-back-btn" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);font-size:18px;cursor:pointer">←</button>'
+    +'<div style="font-size:17px;font-weight:700">MAPアップロード</div>'
+    +'</div>'
+    +'<div style="padding:20px">'
+    +'<div style="font-size:13px;color:var(--ink2);margin-bottom:16px;line-height:1.6">MAPの写真をアップロードすると、Claudeが各人の周辺に書かれた情報を読み取ってコミュニケーション履歴に追記します。</div>'
+    +'<div class="erow"><div class="elabel">📅 MAP日付</div>'
+    +'<input class="efield" type="date" id="map-date" value="'+today+'"></div>'
+    +'<label style="display:block;border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;background:var(--surface2);margin-top:8px">'
+    +'<input type="file" id="map-file" accept="image/*" style="display:none">'
+    +'<div style="font-size:32px;margin-bottom:8px">📷</div>'
+    +'<div style="font-size:14px;font-weight:600;color:var(--ink2)">タップして写真を選択</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-top:4px">JPG・PNG対応</div>'
+    +'</label>'
+    +'<div id="map-preview" style="margin-top:12px"></div>'
+    +'<div id="map-analyze-wrap" style="display:none;margin-top:12px">'
+    +'<button id="btn-analyze" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">MAP を解析する</button>'
+    +'</div>'
+    +'<div id="map-result" style="margin-top:8px"></div>'
+    +'</div></div>';
+
+  document.getElementById('map-back-btn').onclick = closeMapUpload;
+
+  document.getElementById('map-date').addEventListener('change', function(){
+    try { localStorage.setItem('map_date_cache', this.value); } catch(e){}
+  });
+  document.getElementById('map-file').addEventListener('change', function(){
+    var file = this.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      document.getElementById('map-preview').innerHTML =
+        '<img src="'+e.target.result+'" style="width:100%;border-radius:8px">';
+      document.getElementById('map-analyze-wrap').style.display = 'block';
+      document.getElementById('btn-analyze').onclick = function(){
+        doAnalyzeMap(e.target.result);
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+
+function doAnalyzeMap(dataUrl){
+  var btn = document.getElementById('btn-analyze');
+  btn.textContent = '解析中…'; btn.disabled = true;
+  var base64 = dataUrl.split(',')[1];
+  var mediaType = dataUrl.split(';')[0].split(':')[1];
+  var names = people.map(function(p){ return p.name; }).join('、');
+  var apiKey = getApiKey();
+  if(!apiKey){
+    mapError('APIキーが設定されていません。メニュー→設定から入力してください。');
+    return;
+  }
+  var promptText = 'これはAmwayビジネスのMAP（手書き計画表）の写真です。'
+    + 'このMAPは2つのセクションがあります：'
+    + '①よめてるMAP（上半分）：各人物の今月確定しているPV数が丸の横に丸数字で書かれています。'
+    + '②イメージMAP（下半分）：同じ人物が再び登場し、目標PV数・アポ日・アクション・メモが周辺に書かれています。'
+    + '同じ人物が両セクションに登場する場合は統合してください。'
+    + '丸で囲まれた文字が人物名です。丸数字（①②③など）はPV数です。日付はm/d形式です。'
+    + '既知リスト（一致する場合はそちらの名前を使用）: ' + names + '\n\n'
+    + '以下のJSON形式のみで返答してください（他のテキスト一切不要）:\n'
+    + '{"results":[{"name":"人物名","pv_current":よめてるMAPのPV数またはnull,"pv_target":イメージMAPの目標PV数またはnull,"actions":["アポ日やアクション"],"memo":"状況やメモ","known":既知リストと一致する場合true}]}';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: promptText }
+      ]}]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var text = d.content && d.content[0] && d.content[0].text;
+    if(!text){ mapError('解析に失敗しました'); return; }
+    try {
+      var clean = text.replace(/^[\s\S]*?({[\s\S]*})[\s\S]*$/, '$1').trim();
+      showMapResult(JSON.parse(clean));
+    } catch(e){ mapError('結果の読み取りに失敗しました: ' + e.message); }
+  })
+  .catch(function(e){ mapError('通信エラー: ' + e.message); });
+}
+
+function mapError(msg){
+  var btn = document.getElementById('btn-analyze');
+  if(btn){ btn.textContent = 'MAP を解析する'; btn.disabled = false; }
+  var res = document.getElementById('map-result');
+  if(res) res.innerHTML = '<div style="padding:16px;text-align:center;color:var(--accent);font-size:13px">'+msg+'</div>';
+}
+
+var mapSelections = {};
+
+function showMapResult(result){
+  mapLocked = true;
+  mapSelections = {};
+  // 解析結果をlocalStorageに保存
+  try { localStorage.setItem('map_result_cache', JSON.stringify(result)); } catch(e){}
+
+  if(result.unrecognized && result.unrecognized.length && typeof result.unrecognized[0] === 'string'){
+    result.unrecognized = result.unrecognized.map(function(name){
+      return {name:name,pv:null,pv_current:null,pv_target:null,actions:[],memo:''};
+    });
+  }
+  if(result.people && result.people.length && typeof result.people[0] === 'string'){
+    result.people = result.people.map(function(name){
+      return {name:name,pv:null,pv_current:null,pv_target:null,actions:[],memo:''};
+    });
+  }
+
+  var allResults = result.results || [];
+  if(!allResults.length){
+    allResults = (result.people||[]).map(function(p){ return Object.assign({known:true},p); })
+      .concat((result.unrecognized||[]).map(function(p){ return Object.assign({known:false},p); }));
+  }
+
+  var recItems = allResults.filter(function(item){ return item.known; });
+  var unrecItems = allResults.filter(function(item){ return !item.known; });
+
+  var mapDateEl = document.getElementById('map-date');
+  var dateStr;
+  if(mapDateEl && mapDateEl.value){
+    var d = new Date(mapDateEl.value);
+    dateStr = (d.getMonth()+1)+'/'+d.getDate();
+  } else {
+    var now2 = new Date();
+    dateStr = (now2.getMonth()+1)+'/'+now2.getDate();
+  }
+
+  function makeLogText(item){
+    var parts = [];
+    if(item.pv) parts.push('PV: '+item.pv);
+    if(item.pv_current) parts.push('現PV: '+item.pv_current);
+    if(item.pv_target) parts.push('目標PV: '+item.pv_target);
+    if(item.actions && item.actions.length) parts.push('アクション: '+item.actions.join('、'));
+    if(item.memo) parts.push(item.memo);
+    return parts.join(' / ');
+  }
+
+  function makeInfoText(item){
+    var parts = [];
+    if(item.pv_current) parts.push('現PV: '+item.pv_current);
+    if(item.pv_target) parts.push('目標PV: '+item.pv_target);
+    if(item.pv) parts.push('PV: '+item.pv);
+    if(item.actions && item.actions.length) parts.push(item.actions.join('、'));
+    if(item.memo) parts.push(item.memo);
+    return parts.join(' / ');
+  }
+
+  function makeInfoHTML(item, type, idx){
+    var textVal = makeInfoText(item);
+    return '<textarea class="efield map-info-edit" data-type="'+type+'" data-idx="'+idx+'" rows="2" '
+      +'style="font-size:12px;resize:none;line-height:1.5;color:var(--ink2);margin-bottom:8px;width:100%">'+textVal+'</textarea>';
+  }
+
+  function renderResults(){
+    var section = document.getElementById('map-result');
+    if(!section) return;
+    var scrollY = section.scrollTop;
+    var html = '';
+
+    if(recItems.length){
+      html += '<div style="padding:12px 0 6px"><div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--ink3)">✅ 認識できた人（'+recItems.length+'人）</div></div>';
+      recItems.forEach(function(item,idx){
+        var sel = mapSelections['rec_'+idx];
+        html += '<div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid var(--border)">'
+          +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">'+item.name+'</div>'
+          +makeInfoHTML(item,'rec',idx)
+          +(sel
+            ? '<span style="font-size:12px;color:var(--green);font-weight:600">✓ ログに追加予定</span>'
+            : '<button data-type="rec" data-idx="'+idx+'" style="padding:6px 14px;background:var(--green);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">ログに追加</button>'
+          )+'</div>';
+      });
+    }
+
+    if(unrecItems.length){
+      html += '<div style="padding:12px 0 6px"><div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--ink3)">❓ 確認が必要（'+unrecItems.length+'人）</div></div>';
+      unrecItems.forEach(function(item,idx){
+        var sel = mapSelections['unrec_'+idx];
+        var candidates = people.filter(function(p){
+          return p.name.indexOf(item.name)!==-1||item.name.indexOf(p.name)!==-1;
+        }).slice(0,3);
+
+        var actionHTML;
+        if(sel){
+          if(sel.action==='log') actionHTML = '<span style="font-size:12px;color:var(--green);font-weight:600">✓ '+sel.name+' にログ追加予定</span>';
+          else if(sel.action==='naoi') actionHTML = '<span style="font-size:12px;color:#C07800;font-weight:600">直以外フラグ予定</span>';
+          else if(sel.action==='skip') actionHTML = '<span style="font-size:12px;color:var(--ink3)">記録しない</span>';
+          else if(sel.action==='new') actionHTML = '<span style="font-size:12px;color:var(--blue);font-weight:600">✓ '+sel.name+' として新規追加予定</span>';
+        } else {
+          var candBtns = candidates.map(function(p){
+            return '<button data-type="cand" data-idx="'+idx+'" data-pid="'+p.id+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'+p.name+'</button>';
+          }).join('');
+          actionHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+            +candBtns
+            +'<button data-type="search" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">🔍 検索</button>'
+            +'<button data-type="new" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">＋ 新規</button>'
+            +'<button data-type="naoi" data-idx="'+idx+'" style="padding:5px 10px;background:#FEF3E2;border:1.5px solid #E8A030;border-radius:8px;font-size:12px;font-weight:600;color:#C07800;cursor:pointer">直以外</button>'
+            +'<button data-type="skip" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--ink3);cursor:pointer">記録しない</button>'
+            +'</div>';
+        }
+
+        html += '<div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid var(--border)">'
+          +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">「'+item.name+'」</div>'
+          +makeInfoHTML(item,'unrec',idx)
+          +(sel?'':'<div style="font-size:11px;color:var(--ink3);margin-bottom:6px">誰ですか？</div>')
+          +actionHTML+'</div>';
+      });
+    }
+
+    html += '<div style="padding:8px 0 20px"><button id="btn-map-save" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">保存する</button></div>';
+
+    section.innerHTML = html;
+    // 選択状態を保存
+    try { localStorage.setItem('map_selections_cache', JSON.stringify(mapSelections)); } catch(e){}
+
+    // イベントバインド
+    section.querySelectorAll('button[data-type]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var type = btn.dataset.type;
+        var idx = parseInt(btn.dataset.idx);
+        if(type==='rec'){
+          mapSelections['rec_'+idx] = {action:'log'};
+          renderResults();
+        } else if(type==='cand'){
+          var p = people.find(function(x){ return x.id===parseInt(btn.dataset.pid); });
+          if(p){ mapSelections['unrec_'+idx] = {action:'log', name:p.name, personId:p.id}; renderResults(); }
+        } else if(type==='naoi'){
+          mapSelections['unrec_'+idx] = {action:'naoi', name:unrecItems[idx].name};
+          renderResults();
+        } else if(type==='skip'){
+          mapSelections['unrec_'+idx] = {action:'skip'};
+          renderResults();
+        } else if(type==='search'){
+          openMapSearchOverlay(unrecItems[idx], idx, function(p){
+            mapSelections['unrec_'+idx] = {action:'log', name:p.name, personId:p.id};
+            renderResults();
+          });
+        } else if(type==='new'){
+          openMapNewOverlay(unrecItems[idx], idx, function(name){
+            mapSelections['unrec_'+idx] = {action:'new', name:name};
+            renderResults();
+          });
+        }
+      });
+    });
+
+    // 保存ボタン
+    var saveBtn = document.getElementById('btn-map-save');
+    if(saveBtn) saveBtn.addEventListener('click', function(){
+      var saved = 0;
+      Object.keys(mapSelections).forEach(function(key){
+        var sel = mapSelections[key];
+        if(sel.action==='log'){
+          var item, p;
+          var editedText;
+          if(key.indexOf('rec_')===0){
+            item = recItems[parseInt(key.replace('rec_',''))];
+            p = people.find(function(x){ return x.name===item.name; });
+            var ta = document.querySelector('.map-info-edit[data-type="rec"][data-idx="'+parseInt(key.replace('rec_',''))+'"]');
+            editedText = ta ? ta.value.trim() : makeLogText(item);
+          } else {
+            item = unrecItems[parseInt(key.replace('unrec_',''))];
+            p = people.find(function(x){ return x.id===sel.personId; });
+            var ta = document.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+parseInt(key.replace('unrec_',''))+'"]');
+            editedText = ta ? ta.value.trim() : makeLogText(item);
+          }
+          if(p){ p.logs.unshift({date:dateStr, text:'MAP: '+editedText}); saveToSheet(p); saved++; }
+        } else if(sel.action==='naoi'){
+          var item2 = unrecItems[parseInt(key.replace('unrec_',''))];
+          var p2 = people.find(function(x){ return x.name===item2.name; });
+          if(p2 && !p2.flags.includes('直以外')){ p2.flags.push('直以外'); saveToSheet(p2); saved++; }
+        }
+      });
+      render();
+      toast(saved+'件を保存しました ✓');
+      try { localStorage.removeItem('map_result_cache'); localStorage.removeItem('map_selections_cache'); localStorage.removeItem('map_date_cache'); } catch(e){}
+      closeMapUpload();
+    });
+  }
+
+  renderResults();
+}
+
+function openMapSearchOverlay(item, unidx, callback){
+  // オーバーレイで検索画面を表示
+  var overlay = document.createElement('div');
+  overlay.id = 'map-search-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:var(--surface);overflow-y:auto';
+  overlay.innerHTML =
+    '<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--surface);z-index:100">'
+    +'<button id="mso-back" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);font-size:18px;cursor:pointer">←</button>'
+    +'<div style="font-size:16px;font-weight:700;flex:1">「'+item.name+'」は誰？</div>'
+    +'<button id="mso-close" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);font-size:16px;cursor:pointer">✕</button>'
+    +'</div>'
+    +'<div style="padding:20px">'
+    +'<input class="efield" id="mso-inp" placeholder="名前で検索…" style="font-size:15px">'
+    +'</div>'
+    +'<div id="mso-list" style="padding:0 20px"></div>';
+
+  document.body.appendChild(overlay);
+
+  function closeOverlay(){ var o=document.getElementById('map-search-overlay'); if(o)o.remove(); }
+  document.getElementById('mso-back').onclick = closeOverlay;
+  document.getElementById('mso-close').onclick = closeOverlay;
+
+  var inp = document.getElementById('mso-inp');
+  setTimeout(function(){ if(inp) inp.focus(); }, 100);
+  inp.addEventListener('input', function(){
+    var q = inp.value.trim();
+    var listEl = document.getElementById('mso-list');
+    if(!q){ listEl.innerHTML=''; return; }
+    var hits = people.filter(function(p){ return p.name.indexOf(q)!==-1; });
+    listEl.innerHTML = hits.map(function(p){
+      return '<div class="mso-item" data-pid="'+p.id+'" style="padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:15px;font-weight:600">'+p.name+'</span>'
+        +'<span style="font-size:12px;color:var(--ink3)">選択 →</span>'
+        +'</div>';
+    }).join('') || '<div style="color:var(--ink3);font-size:13px;padding:20px;text-align:center">該当なし</div>';
+    listEl.querySelectorAll('.mso-item').forEach(function(el){
+      el.onclick = function(){
+        var p = people.find(function(x){ return x.id===parseInt(el.dataset.pid); });
+        if(!p) return;
+        if(callback) callback(p);
+        closeOverlay();
+      };
+    });
+  });
+}
+
+function openMapNewOverlay(item, unidx, callback){
+  // MAP画面の上にオーバーレイで新規追加フォームを表示
+  var existing = document.getElementById('map-new-overlay');
+  if(existing) existing.remove();
+
+  var mapDateEl = document.getElementById('map-date');
+  var dateStr = mapDateEl && mapDateEl.value
+    ? (function(){ var d=new Date(mapDateEl.value); return (d.getMonth()+1)+'/'+d.getDate(); })()
+    : (function(){ var n=new Date(); return (n.getMonth()+1)+'/'+n.getDate(); })();
+
+  var ov = document.createElement('div');
+  ov.id = 'map-new-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:600;background:var(--bg);overflow-y:auto';
+
+  var lecsHTML = LECS.map(function(l){
+    return '<div><div class="llabel">'+l+'</div>'
+      +'<input class="efield mnov-lec" type="date" data-lec="'+l+'" style="padding:8px 10px;font-size:13px"></div>';
+  }).join('');
+
+  ov.innerHTML =
+    '<div style="background:var(--surface);padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">'
+    +'<button id="mnov-close" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);font-size:18px;cursor:pointer">✕</button>'
+    +'<div style="font-size:17px;font-weight:700">新規追加</div>'
+    +'</div>'
+    +'<div style="padding:20px">'
+    +'<input class="efield" id="mnov-name" placeholder="名前" value="'+item.name+'" style="font-size:20px;font-weight:700;padding:6px 10px;margin-bottom:8px">'
+    +'<textarea class="efield" id="mnov-memo" rows="2" placeholder="メモ" style="font-size:12px;resize:none;line-height:1.5;color:var(--ink2)"></textarea>'
+    +'<div class="ssec"><div class="erow"><div class="elabel">登録状況</div>'
+    +'<div class="spicker">'
+    +'<button class="sbtn snone active" data-s="none" id="mnov-s-none">未登録</button>'
+    +'<button class="sbtn" data-s="pc" id="mnov-s-pc">PC</button>'
+    +'<button class="sbtn" data-s="abo" id="mnov-s-abo">ABO</button>'
+    +'</div></div>'
+    +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="mnov-reminder"></div>'
+    +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="mnov-birthday"></div>'
+    +'<div class="erow"><div class="elabel">フラグ</div>'
+    +'<div class="fwrap" id="mnov-fwrap">'+allFlags.map(function(f){return '<button class="fbtn" data-flag="'+f+'">'+f+'</button>';}).join('')+'<button class="fadd" id="mnov-fadd">＋</button></div></div>'
+    +'</div>'
+    +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lecsHTML+'</div></div>'
+    +'<div style="padding:0 0 20px">'
+    +'<button id="mnov-save" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">追加する</button>'
+    +'</div></div>';
+
+  document.body.appendChild(ov);
+
+  var curStatus = 'none';
+  var mnovSelFlags = [];
+  ov.querySelectorAll('[data-s]').forEach(function(btn){
+    btn.onclick = function(){
+      curStatus = btn.dataset.s;
+      ov.querySelectorAll('[data-s]').forEach(function(b){ b.className = b.className.replace(' s'+b.dataset.s,''); });
+      btn.className += ' s'+curStatus;
+    };
+  });
+  function bindMnovFlags(){
+    ov.querySelectorAll('#mnov-fwrap .fbtn').forEach(function(btn){
+      btn.onclick = function(){
+        var f = btn.dataset.flag;
+        var i = mnovSelFlags.indexOf(f);
+        if(i===-1){mnovSelFlags.push(f);btn.classList.add('on');btn.textContent='✓ '+f;}
+        else{mnovSelFlags.splice(i,1);btn.classList.remove('on');btn.textContent=f;}
+      };
+    });
+  }
+  bindMnovFlags();
+  document.getElementById('mnov-fadd').onclick = function(){
+    var name = prompt('新しいフラグ名を入力');
+    if(!name||!name.trim()) return;
+    name = name.trim();
+    if(allFlags.includes(name)){toast('すでに存在するフラグです');return;}
+    allFlags.push(name);
+    var wrap = document.getElementById('mnov-fwrap');
+    var addBtn = document.getElementById('mnov-fadd');
+    var newBtn = document.createElement('button');
+    newBtn.className = 'fbtn on';
+    newBtn.dataset.flag = name;
+    newBtn.textContent = '✓ '+name;
+    wrap.insertBefore(newBtn, addBtn);
+    mnovSelFlags.push(name);
+    bindMnovFlags();
+  };
+
+  document.getElementById('mnov-close').onclick = function(){ ov.remove(); };
+
+  document.getElementById('mnov-save').onclick = function(){
+    var name = document.getElementById('mnov-name').value.trim();
+    if(!name){ toast('名前を入力してください'); return; }
+    var lecs = {};
+    LECS.forEach(function(l){ lecs[l]=null; });
+    ov.querySelectorAll('.mnov-lec').forEach(function(el){
+      lecs[el.dataset.lec] = el.value ? el.value.replace(/-/g,'/') : null;
+    });
+    var memo = document.getElementById('mnov-memo').value.trim();
+    var rem = document.getElementById('mnov-reminder').value || null;
+    var bd = document.getElementById('mnov-birthday').value || null;
+
+    // テキストエリアの編集内容を取得
+    var infoTa = document.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+unidx+'"]');
+    var infoText = infoTa ? infoTa.value.trim() : '';
+
+    var newPerson = {
+      id:nextId(), name:name, memo:memo,
+      status:curStatus, flags:mnovSelFlags.slice(),
+      reminder:rem, lastContact:todayStr(),
+      makerDate:null, birthday:bd,
+      lectures:lecs,
+      logs: infoText ? [{date:dateStr, text:'MAP: '+infoText}] : []
+    };
+    people.unshift(newPerson);
+    saveToSheet(newPerson);
+    ov.remove();
+    if(callback) callback(name);
+    render();
+    toast(name+' を追加しました ✓');
+  };
+}
+
+
 function closeSheet(){
+  if(mapLocked) return;
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('sheet').classList.remove('open');
+}
+function forceCloseSheet(){
+  mapLocked = false;
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').classList.remove('open');
 }
@@ -735,9 +1423,13 @@ function toast(msg){
 document.getElementById('btn-add').onclick=openAdd;
 var btnFlagMgr=document.getElementById('btn-flag-mgr');
 if(btnFlagMgr)btnFlagMgr.onclick=function(){openFlagMgr(function(){render();})};
-document.getElementById('overlay').onclick=closeSheet;
+document.getElementById('overlay').onclick=function(){
+  if(mapLocked) return; // MAP解析結果表示中は閉じない
+  closeSheet();
+};
 // チップはrenderChips()で動的生成
 document.getElementById('btn-search').onclick=openSearch;
+document.getElementById('btn-menu').onclick=openMenu;
 document.querySelectorAll('.tab').forEach(function(el){
   el.onclick=function(){
     curCat=el.dataset.c;
@@ -770,7 +1462,27 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-loadFromSheet();
+// リロード時の画面復元
+if(window.location.hash === '#map'){
+  loadFromSheet();
+  setTimeout(function(){
+    openMapUpload();
+    // 解析結果キャッシュがあれば復元
+    setTimeout(function(){
+      try {
+        var cached = localStorage.getItem('map_result_cache');
+        var selCached = localStorage.getItem('map_selections_cache');
+        if(cached){
+          mapLocked = true;
+          if(selCached) mapSelections = JSON.parse(selCached);
+          showMapResult(JSON.parse(cached));
+        }
+      } catch(e){}
+    }, 300);
+  }, 500);
+} else {
+  loadFromSheet();
+}
 </script>
 </body>
 </html>
