@@ -520,10 +520,11 @@ function bindDetail(){
 
   function bindLogEvents(){
     var logList = document.getElementById('log-list');
+    if(!logList) return;
     var selCount = document.getElementById('log-sel-count');
     var delBtn = document.getElementById('btn-log-del');
 
-    // イベント委譲でlog-list全体を監視
+    // 毎回新しいonclick/onchangeを設定（上書きで重複防止）
     logList.onclick = function(e){
       var target = e.target;
 
@@ -570,14 +571,14 @@ function bindDetail(){
       }
     };
 
-    // チェックボックス変更はchangeイベント委譲
-    logList.addEventListener('change', function(e){
+    // onchangeで上書き（重複防止）
+    logList.onchange = function(e){
       if(e.target.classList.contains('lchk')){
         var sel = logList.querySelectorAll('.lchk:checked').length;
         if(selCount) selCount.textContent = sel ? sel+'件選択中' : '';
         if(delBtn) delBtn.style.display = sel ? 'inline-block' : 'none';
       }
-    });
+    };
   }
 
   var ladd=document.getElementById('btn-ladd');
@@ -596,7 +597,8 @@ function bindDetail(){
 
   var logDelBtn = document.getElementById('btn-log-del');
   if(logDelBtn) logDelBtn.onclick = function(){
-    var checked = document.querySelectorAll('.lchk:checked');
+    var logList2 = document.getElementById('log-list');
+    var checked = logList2 ? logList2.querySelectorAll('.lchk:checked') : [];
     var idxs = [];
     checked.forEach(function(c){ idxs.push(parseInt(c.dataset.idx)); });
     if(!idxs.length) return;
