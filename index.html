@@ -902,9 +902,10 @@ function doAnalyzeMap(dataUrl){
     + '②イメージMAP（下半分）：同じ人物が再び登場し、目標PV数・アポ日・アクション・メモが周辺に書かれています。'
     + '同じ人物が両セクションに登場する場合は統合してください。'
     + '丸で囲まれた文字が人物名です。丸数字（①②③など）はPV数です。日付はm/d形式です。'
+    + 'actionsとmemoは手書きメモを読み取り、自然な日本語に整えて記載してください。略語・記号・箇条書きは読みやすい文章に変換してください。\n\n'
     + '既知リスト（一致する場合はそちらの名前を使用）: ' + names + '\n\n'
     + '以下のJSON形式のみで返答してください（他のテキスト一切不要）:\n'
-    + '{"results":[{"name":"人物名","pv_current":よめてるMAPのPV数またはnull,"pv_target":イメージMAPの目標PV数またはnull,"actions":["アポ日やアクション"],"memo":"状況やメモ","known":既知リストと一致する場合true}]}';
+    + '{"results":[{"name":"人物名","pv_current":よめてるMAPのPV数またはnull,"pv_target":イメージMAPの目標PV数またはnull,"actions":["整えた日本語のアクション"],"memo":"整えた日本語のメモ","known":既知リストと一致する場合true}]}';
 
   fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1004,7 +1005,9 @@ function showMapResult(result){
           +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">既存メモ</div>'
           +'<textarea class="efield map-memo-edit" data-type="rec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:8px;width:100%">'+memoText+'</textarea>'
           +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">読み取り内容</div>'
-          +'<textarea class="efield map-info-edit" data-type="rec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:10px;width:100%">'+infoText+'</textarea>'
+          +'<textarea class="efield map-info-edit" data-type="rec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:8px;width:100%">'+infoText+'</textarea>'
+          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">📅 リマインド日</div>'
+          +'<input type="date" class="efield map-reminder-edit" data-type="rec" data-idx="'+idx+'" value="'+((sel.reminder!==undefined?sel.reminder:((people.find(function(x){return x.name===item.name;})||{}).reminder||''))).replace(/\//g,'-')+'" style="font-size:12px;padding:6px 8px;margin-bottom:10px;width:100%">'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
           +'<button class="map-action-btn'+(action==='update'?' map-action-on':'')+'" data-type="rec" data-idx="'+idx+'" data-action="update" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='update'?'var(--accent)':'var(--surface2)')+';color:'+(action==='update'?'white':'var(--ink2)')+'">更新</button>'
           +'<button class="map-action-btn'+(action==='append'?' map-action-on':'')+'" data-type="rec" data-idx="'+idx+'" data-action="append" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='append'?'var(--green)':'var(--surface2)')+';color:'+(action==='append'?'white':'var(--ink2)')+'">追記</button>'
@@ -1034,12 +1037,16 @@ function showMapResult(result){
 
         html += '<div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid var(--border)">'
           +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">「'+item.name+'」</div>'
-          +(assignedPerson
+          +(sel.action==='skip'
+            ? '<span style="font-size:12px;color:var(--ink3)">記録しない ✓ <button class="map-undo-btn" data-idx="'+idx+'" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline">取り消し</button></span>'
+            : assignedPerson
             ? '<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px">→ '+assignedPerson.name+'</div>'
               +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">既存メモ</div>'
               +'<textarea class="efield map-memo-edit" data-type="unrec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:8px;width:100%">'+memoText+'</textarea>'
               +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">読み取り内容</div>'
-              +'<textarea class="efield map-info-edit" data-type="unrec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:10px;width:100%">'+infoText+'</textarea>'
+              +'<textarea class="efield map-info-edit" data-type="unrec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:8px;width:100%">'+infoText+'</textarea>'
+              +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">📅 リマインド日</div>'
+              +'<input type="date" class="efield map-reminder-edit" data-type="unrec" data-idx="'+idx+'" value="'+reminderVal.replace(/\//g,'-')+'" style="font-size:12px;padding:6px 8px;margin-bottom:10px;width:100%">'
               +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
               +'<button class="map-action-btn'+(action==='update'?' map-action-on':'')+'" data-type="unrec" data-idx="'+idx+'" data-action="update" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='update'?'var(--accent)':'var(--surface2)')+';color:'+(action==='update'?'white':'var(--ink2)')+'">更新</button>'
               +'<button class="map-action-btn'+(action==='append'?' map-action-on':'')+'" data-type="unrec" data-idx="'+idx+'" data-action="append" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='append'?'var(--green)':'var(--surface2)')+';color:'+(action==='append'?'white':'var(--ink2)')+'">追記</button>'
@@ -1073,6 +1080,14 @@ function showMapResult(result){
         var key = type+'_'+idx;
         if(!mapSelections[key]) mapSelections[key] = {};
         mapSelections[key].memoText = ta.value;
+      };
+    });
+    section.querySelectorAll('.map-reminder-edit').forEach(function(inp){
+      inp.onchange = function(){
+        var type=inp.dataset.type; var idx=parseInt(inp.dataset.idx);
+        var key=type+'_'+idx;
+        if(!mapSelections[key]) mapSelections[key]={};
+        mapSelections[key].reminder = inp.value;
       };
     });
     section.querySelectorAll('.map-info-edit').forEach(function(ta){
@@ -1149,6 +1164,15 @@ function showMapResult(result){
       };
     });
 
+    // 取り消し
+    section.querySelectorAll('.map-undo-btn').forEach(function(btn){
+      btn.onclick = function(){
+        var idx = parseInt(btn.dataset.idx);
+        delete mapSelections['unrec_'+idx];
+        renderResults();
+      };
+    });
+
     // 記録しない
     section.querySelectorAll('.map-skip-btn2').forEach(function(btn){
       btn.onclick = function(){
@@ -1178,6 +1202,8 @@ function showMapResult(result){
         } else if(sel.action === 'append'){
           p2.memo = p2.memo ? p2.memo + '\n' + infoVal : infoVal;
         }
+        var remInp=section.querySelector('.map-reminder-edit[data-type="rec"][data-idx="'+idx+'"]');
+        if(remInp && remInp.value) p2.reminder=remInp.value;
         saveToSheet(p2);
         saved++;
       });
@@ -1202,6 +1228,8 @@ function showMapResult(result){
         } else if(sel.action === 'append'){
           p2.memo = p2.memo ? p2.memo + '\n' + infoVal : infoVal;
         }
+                var remInpU=section.querySelector('.map-reminder-edit[data-type="unrec"][data-idx="'+idx+'"]');
+        if(remInpU && remInpU.value) p2.reminder=remInpU.value;
         saveToSheet(p2);
         saved++;
       });
