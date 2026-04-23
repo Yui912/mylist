@@ -362,7 +362,6 @@ function dHTML(p){
     var on=p.flags.includes(f);
     return '<button class="fbtn'+(on?' on':'')+'" data-flag="'+f+'">'+(on?'✓ ':'')+f+'</button>';
   }).join('');
-  var li=renderLogsHTML(p.logs);
   var ss=function(s){return p.status===s?' s'+s:''};
   return '<div class="shdr">'
     +'<div style="flex:1">'
