@@ -130,7 +130,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     </div>
     <div id="owner-label" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:11px;color:var(--ink3)" id="filter-count"></div>
+      
       <button id="btn-search" style="height:32px;padding:0 12px;border-radius:16px;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">名前🔍</button>
       <button class="hadd" id="btn-add" style="width:auto;padding:0 12px;border-radius:16px;font-size:12px;font-weight:700;white-space:nowrap">List＋</button>
     </div>
@@ -138,7 +138,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
   <div class="chip-strip" id="chip-strip">
     <!-- 動的に生成 -->
   </div>
-  <div class="tabs">
+  <div class="tabs" id="tabs-wrap">
     <div class="tab active" data-c="all">全員</div>
     <div class="tab" data-c="none">未登録</div>
     <div class="tab" data-c="pc">PC</div>
@@ -180,8 +180,13 @@ function loadFromSheet(){
     .then(function(data){
       if(data.people){
         people = data.people;
-        // スプシのデータからカスタムフラグを復元
+        var today = new Date(); today.setHours(0,0,0,0);
+        // 過去の次アポをリセット＆カスタムフラグを復元
         people.forEach(function(p){
+          if(p.nextApo && new Date(p.nextApo) < today){
+            p.nextApo = null;
+            saveToSheet(p);
+          }
           if(p.flags && p.flags.length){
             p.flags.forEach(function(f){
               if(f !== 'アプローチしない' && f !== '直以外' && f !== '独立' && !allFlags.includes(f)){
@@ -226,7 +231,12 @@ function getList(){
   var list=people.slice();
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
   if(curFilter!=='all')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
-  if(curFilter==='reminder'){
+  if(curFilter==='nextapo'){
+    var today=new Date(); today.setHours(0,0,0,0);
+    list=list.filter(function(p){
+      return p.nextApo && new Date(p.nextApo)>=today;
+    }).sort(function(a,b){return new Date(a.nextApo)-new Date(b.nextApo)});
+  } else if(curFilter==='reminder'){
     list=list.filter(function(p){return p.reminder}).sort(function(a,b){return new Date(a.reminder)-new Date(b.reminder)});
   } else if(curFilter==='birthday'){
     list=list.filter(function(p){
@@ -255,7 +265,7 @@ function render(){
   document.getElementById('total-count').textContent=people.length+'人';
   var ol=document.getElementById('owner-label');
   if(ol)ol.textContent=OWNER!=='default'?OWNER:'';
-  document.getElementById('filter-count').textContent=list.length!==people.length?'表示中 '+list.length+'人':'';
+  // filter-count removed
 
   renderChips();
 
@@ -263,7 +273,13 @@ function render(){
   if(list.length===0){wrap.innerHTML='<div class="empty">該当する人がいません</div>';return}
 
   var html='';
-  if(curFilter==='reminder'){
+  if(curFilter==='nextapo'){
+    var today2=new Date(); today2.setHours(0,0,0,0);
+    var todayApo=list.filter(function(p){ var d=new Date(p.nextApo); d.setHours(0,0,0,0); return d.getTime()===today2.getTime(); });
+    var futureApo=list.filter(function(p){ var d=new Date(p.nextApo); d.setHours(0,0,0,0); return d.getTime()>today2.getTime(); });
+    if(todayApo.length){html+='<div class="slabel">📅 今日</div>';todayApo.forEach(function(p){html+=cHTML(p)})}
+    if(futureApo.length){html+='<div class="slabel">予定</div>';futureApo.forEach(function(p){html+=cHTML(p)})}
+  } else if(curFilter==='reminder'){
     var over=list.filter(function(p){return ddiff(p.reminder)<0});
     var soon=list.filter(function(p){var d=ddiff(p.reminder);return d!==null&&d>=0&&d<=2});
     var up=list.filter(function(p){return ddiff(p.reminder)>2});
@@ -374,6 +390,11 @@ function dHTML(p){
     +'<button class="sbtn'+ss('pc')+'" data-s="pc">PC</button>'
     +'<button class="sbtn'+ss('abo')+'" data-s="abo">ABO</button>'
     +'</div></div>'
+    +'<div class="erow"><div class="elabel">📌 次アポ日</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-nextapo" value="'+(p.nextApo||'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-nextapo" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div>'
     +'<div style="display:flex;gap:6px;align-items:center">'
     +'<input class="efield" type="date" id="f-reminder" value="'+(p.reminder||'')+'" style="flex:1">'
@@ -408,6 +429,8 @@ function bindDetail(){
     if(m)p.memo=m.value;
     if(r)p.reminder=r.value||null;
     if(mk)p.makerDate=mk.value||null;
+    var na=document.getElementById('f-nextapo');
+    if(na)p.nextApo=na.value||null;
     var bd=document.getElementById('f-birthday');
     if(bd)p.birthday=bd.value||null;
     document.querySelectorAll('[data-lec]').forEach(function(el){
@@ -425,6 +448,7 @@ function bindDetail(){
   });
   var fn=document.getElementById('f-name');if(fn)fn.addEventListener('input',save);
   var fm=document.getElementById('f-memo');if(fm)fm.addEventListener('input',save);
+  var fna=document.getElementById('f-nextapo');if(fna)fna.addEventListener('change',save);
   var fr=document.getElementById('f-reminder');if(fr)fr.addEventListener('change',save);
   var fmk=document.getElementById('f-maker');if(fmk)fmk.addEventListener('change',save);
   var fbd=document.getElementById('f-birthday');if(fbd)fbd.addEventListener('change',save);
@@ -494,6 +518,7 @@ function openAdd(){
     +'<button class="sbtn" data-s="pc">PC</button>'
     +'<button class="sbtn" data-s="abo">ABO</button>'
     +'</div></div>'
+    +'<div class="erow"><div class="elabel">📌 次アポ日</div><input class="efield" type="date" id="f-nextapo"></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="f-reminder"></div>'
     +'<div class="erow"><div class="elabel">📣 マケ日</div><input class="efield" type="date" id="f-maker"></div>'
     +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="f-birthday"></div>'
@@ -521,6 +546,7 @@ function openAdd(){
       lecs[el.dataset.lec]=el.value?el.value.replace(/-/g,'/'):null;
     });
     var memo=document.getElementById('f-memo');
+    var na2=document.getElementById('f-nextapo');
     var rem=document.getElementById('f-reminder');
     var mk=document.getElementById('f-maker');
     var bd=document.getElementById('f-birthday');
@@ -532,6 +558,7 @@ function openAdd(){
       lastContact:todayStr(),
       makerDate:mk?mk.value||null:null,
       birthday:bd?bd.value||null:null,
+      nextApo:na2?na2.value||null:null,
       lectures:lecs,logs:[]
     });
     saveToSheet(people[0]);
@@ -629,7 +656,13 @@ function renderChips(){
 
   var html='';
   html+='<button id="btn-flag-mgr" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">＋</button>';
+  var ac=people.filter(function(p){
+    if(!p.nextApo) return false;
+    var today=new Date(); today.setHours(0,0,0,0);
+    return new Date(p.nextApo)>=today;
+  }).length;
   html+=chip('all','すべて','');
+  if(ac>0) html+=chip('nextapo','次アポ ('+ac+')','#4A90D9');
   html+=chip('reminder','リマインドあり ('+rc+')','#C8472B');
   html+=chip('birthday','🎂 誕生日近い ('+bc+')','');
   html+=chip('random','🎲 ランダム','');
@@ -651,17 +684,35 @@ function renderChips(){
       renderList();
     };
   });
+  // タブに人数表示
+  var tabCounts = {all:people.length, none:0, pc:0, abo:0};
+  people.forEach(function(p){
+    if(p.status==='none'||!p.status) tabCounts.none++;
+    else if(p.status==='pc') tabCounts.pc++;
+    else if(p.status==='abo') tabCounts.abo++;
+  });
+  document.querySelectorAll('.tab').forEach(function(t){
+    var c = t.dataset.c;
+    var n = tabCounts[c];
+    t.textContent = (c==='all'?'全員':c==='none'?'未登録':c==='pc'?'PC':'ABO') + (n>0?' ('+n+')':'');
+  });
   var mgr=document.getElementById('btn-flag-mgr');
   if(mgr)mgr.onclick=function(){openFlagMgr(function(){render();})};
 }
 
 function renderList(){
   var list=getList();
-  document.getElementById('filter-count').textContent=list.length!==people.length?'表示中 '+list.length+'人':'';
+  // filter-count removed
   var wrap=document.getElementById('list-wrap');
   if(list.length===0){wrap.innerHTML='<div class="empty">該当する人がいません</div>';return}
   var html='';
-  if(curFilter==='reminder'){
+  if(curFilter==='nextapo'){
+    var today2=new Date(); today2.setHours(0,0,0,0);
+    var todayApo=list.filter(function(p){ var d=new Date(p.nextApo); d.setHours(0,0,0,0); return d.getTime()===today2.getTime(); });
+    var futureApo=list.filter(function(p){ var d=new Date(p.nextApo); d.setHours(0,0,0,0); return d.getTime()>today2.getTime(); });
+    if(todayApo.length){html+='<div class="slabel">📅 今日</div>';todayApo.forEach(function(p){html+=cHTML(p)})}
+    if(futureApo.length){html+='<div class="slabel">予定</div>';futureApo.forEach(function(p){html+=cHTML(p)})}
+  } else if(curFilter==='reminder'){
     var over=list.filter(function(p){return ddiff(p.reminder)<0});
     var soon=list.filter(function(p){var d=ddiff(p.reminder);return d!==null&&d>=0&&d<=2});
     var up=list.filter(function(p){return ddiff(p.reminder)>2});
@@ -902,10 +953,11 @@ function doAnalyzeMap(dataUrl){
     + '②イメージMAP（下半分）：同じ人物が再び登場し、目標PV数・アポ日・アクション・メモが周辺に書かれています。'
     + '同じ人物が両セクションに登場する場合は統合してください。'
     + '丸で囲まれた文字が人物名です。丸数字（①②③など）はPV数です。日付はm/d形式です。'
-    + 'actionsとmemoは手書きメモを読み取り、自然な日本語に整えて記載してください。略語・記号・箇条書きは読みやすい文章に変換してください。\n\n'
+    + 'actionsとmemoは手書きメモを読み取り、自然な日本語に整えて記載してください。略語・記号・箇条書きは読みやすい文章に変換してください。\n'
+    + '次のアポイント日付（例:4/26、3/20など）が読み取れた場合はnext_apoに"YYYY-MM-DD"形式で入れてください。\n\n'
     + '既知リスト（一致する場合はそちらの名前を使用）: ' + names + '\n\n'
     + '以下のJSON形式のみで返答してください（他のテキスト一切不要）:\n'
-    + '{"results":[{"name":"人物名","pv_current":よめてるMAPのPV数またはnull,"pv_target":イメージMAPの目標PV数またはnull,"actions":["整えた日本語のアクション"],"memo":"整えた日本語のメモ","known":既知リストと一致する場合true}]}';
+    + '{"results":[{"name":"人物名","pv_current":null,"pv_target":null,"next_apo":"YYYY-MM-DDまたはnull","actions":["整えた日本語のアクション"],"memo":"整えた日本語のメモ","known":true}]}';
 
   fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -977,6 +1029,7 @@ function showMapResult(result){
     if(item.memo) parts.push(item.memo);
     return parts.join(' / ');
   }
+  function getNextApo(item){ return item.next_apo || null; }
 
   function getVal(key, field, fallback){
     var sel = mapSelections[key] || {};
@@ -997,6 +1050,7 @@ function showMapResult(result){
         var infoText=getVal(key,'infoText',makeInfoText(item));
         var memoText=getVal(key,'memoText',p2?p2.memo||'':'');
         var reminder=getVal(key,'reminder',p2?p2.reminder||'':'').replace(/\//g,'-');
+        var recNextApo=getVal(key,'nextApo',p2?p2.nextApo||'':'').replace(/\//g,'-');
         html+='<div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid var(--border)">'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
           +'<div style="font-size:14px;font-weight:700">'+item.name+'</div>'
@@ -1006,6 +1060,8 @@ function showMapResult(result){
           +'<textarea class="efield mme" data-key="'+key+'" data-field="memoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+memoText+'</textarea>'
           +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">読み取り内容</div>'
           +'<textarea class="efield mie" data-key="'+key+'" data-field="infoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+infoText+'</textarea>'
+          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📌 次アポ日</div>'
+          +'<input type="date" class="efield mnae" data-key="'+key+'" data-field="nextApo" value="'+recNextApo+'" style="font-size:12px;padding:6px 8px;margin-bottom:6px;width:100%">'
           +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📅 リマインド日</div>'
           +'<input type="date" class="efield mre" data-key="'+key+'" data-field="reminder" value="'+reminder+'" style="font-size:12px;padding:6px 8px;margin-bottom:10px;width:100%">'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
@@ -1048,6 +1104,8 @@ function showMapResult(result){
             +'<textarea class="efield mme" data-key="'+key+'" data-field="memoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+memoText+'</textarea>'
             +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">読み取り内容</div>'
             +'<textarea class="efield mie" data-key="'+key+'" data-field="infoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+infoText+'</textarea>'
+            +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📌 次アポ日</div>'
+            +'<input type="date" class="efield mnae" data-key="'+key+'" data-field="nextApo" value="'+getVal(key,'nextApo',(assignedP?assignedP.nextApo||'':'')).replace(/\//g,'-')+'" style="font-size:12px;padding:6px 8px;margin-bottom:6px;width:100%">'
             +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📅 リマインド日</div>'
             +'<input type="date" class="efield mre" data-key="'+key+'" data-field="reminder" value="'+reminder+'" style="font-size:12px;padding:6px 8px;margin-bottom:10px;width:100%">'
             +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
@@ -1088,7 +1146,7 @@ function showMapResult(result){
         try{ localStorage.setItem('map_selections_cache', JSON.stringify(mapSelections)); }catch(e){}
       };
     });
-    section.querySelectorAll('.mre').forEach(function(inp){
+    section.querySelectorAll('.mre,.mnae').forEach(function(inp){
       inp.onchange = function(){
         if(!mapSelections[inp.dataset.key]) mapSelections[inp.dataset.key]={};
         mapSelections[inp.dataset.key][inp.dataset.field] = inp.value;
@@ -1120,7 +1178,7 @@ function showMapResult(result){
         if(!p2) return;
         var mie=section.querySelector('.mie[data-key="'+key+'"]');
         var infoText=mie?mie.value:makeInfoText(unrecItems[parseInt(key.replace('unrec_',''))]);
-        mapSelections[key]={personId:p2.id,infoText:infoText,memoText:p2.memo||'',reminder:p2.reminder||'',action:''};
+        mapSelections[key]={personId:p2.id,infoText:infoText,memoText:p2.memo||'',reminder:p2.reminder||'',nextApo:p2.nextApo||'',action:''};
         renderResults();
       };
     });
@@ -1133,7 +1191,7 @@ function showMapResult(result){
         var mie=section.querySelector('.mie[data-key="'+key+'"]');
         var infoText=mie?mie.value:makeInfoText(unrecItems[idx]);
         openMapSearchOverlay(unrecItems[idx], idx, function(p2){
-          mapSelections[key]={personId:p2.id,infoText:infoText,memoText:p2.memo||'',reminder:p2.reminder||'',action:''};
+          mapSelections[key]={personId:p2.id,infoText:infoText,memoText:p2.memo||'',reminder:p2.reminder||'',nextApo:p2.nextApo||'',action:''};
           renderResults();
         });
       };
@@ -1148,7 +1206,7 @@ function showMapResult(result){
         var infoText=mie?mie.value:makeInfoText(unrecItems[idx]);
         openMapNewOverlay(unrecItems[idx], idx, function(name){
           var newP=people[0];
-          mapSelections[key]={personId:newP.id,infoText:infoText,memoText:newP.memo||'',reminder:newP.reminder||'',action:''};
+          mapSelections[key]={personId:newP.id,infoText:infoText,memoText:newP.memo||'',reminder:newP.reminder||'',nextApo:newP.nextApo||'',action:''};
           renderResults();
         });
       };
@@ -1238,6 +1296,8 @@ function showMapResult(result){
         if(sel.action==='update') p2.memo=infoVal;
         else if(sel.action==='append') p2.memo=p2.memo?p2.memo+'\n'+infoVal:infoVal;
         if(mre&&mre.value) p2.reminder=mre.value;
+        var mnae2=section.querySelector('.mnae[data-key="'+key+'"]');
+        if(mnae2) p2.nextApo=mnae2.value||null;
         saveToSheet(p2); saved++;
       });
       unrecItems.forEach(function(item,idx){
@@ -1257,6 +1317,8 @@ function showMapResult(result){
         if(sel.action==='update') p2.memo=infoVal;
         else if(sel.action==='append') p2.memo=p2.memo?p2.memo+'\n'+infoVal:infoVal;
         if(mre&&mre.value) p2.reminder=mre.value;
+        var mnae3=section.querySelector('.mnae[data-key="'+key+'"]');
+        if(mnae3) p2.nextApo=mnae3.value||null;
         saveToSheet(p2); saved++;
       });
       try{localStorage.removeItem('map_result_cache');localStorage.removeItem('map_selections_cache');localStorage.removeItem('map_date_cache');}catch(e){}
@@ -1352,6 +1414,7 @@ function openMapNewOverlay(item, unidx, callback){
     +'<button class="sbtn" data-s="pc" id="mnov-s-pc">PC</button>'
     +'<button class="sbtn" data-s="abo" id="mnov-s-abo">ABO</button>'
     +'</div></div>'
+    +'<div class="erow"><div class="elabel">📌 次アポ日</div><input class="efield" type="date" id="mnov-nextapo"></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="mnov-reminder"></div>'
     +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="mnov-birthday"></div>'
     +'<div class="erow"><div class="elabel">フラグ</div>'
@@ -1412,6 +1475,7 @@ function openMapNewOverlay(item, unidx, callback){
       lecs[el.dataset.lec] = el.value ? el.value.replace(/-/g,'/') : null;
     });
     var memo = document.getElementById('mnov-memo').value.trim();
+    var na3 = document.getElementById('mnov-nextapo') ? document.getElementById('mnov-nextapo').value || null : null;
     var rem = document.getElementById('mnov-reminder').value || null;
     var bd = document.getElementById('mnov-birthday').value || null;
 
@@ -1422,7 +1486,7 @@ function openMapNewOverlay(item, unidx, callback){
     var newPerson = {
       id:nextId(), name:name, memo:memo,
       status:curStatus, flags:mnovSelFlags.slice(),
-      reminder:rem, lastContact:todayStr(),
+      nextApo:na3, reminder:rem, lastContact:todayStr(),
       makerDate:null, birthday:bd,
       lectures:lecs, logs:[]
     };
