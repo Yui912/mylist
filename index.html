@@ -1174,47 +1174,90 @@ function openMapSearchOverlay(item, unidx, callback){
 }
 
 function openMapNewOverlay(item, unidx, callback){
-  openAdd();
-  setTimeout(function(){
-    var nameEl = document.getElementById('f-name');
-    if(nameEl) nameEl.value = item.name;
-    var saveBtn = document.getElementById('btn-save');
-    if(saveBtn){
-      saveBtn.onclick = function(){
-        var name = document.getElementById('f-name').value.trim();
-        if(!name){ toast('名前を入力してください'); return; }
-        var lecs = {};
-        LECS.forEach(function(l){ lecs[l]=null; });
-        document.querySelectorAll('[data-lec]').forEach(function(el){
-          lecs[el.dataset.lec] = el.value ? el.value.replace(/-/g,'/') : null;
-        });
-        var memo=document.getElementById('f-memo');
-        var rem=document.getElementById('f-reminder');
-        var mk=document.getElementById('f-maker');
-        var bd=document.getElementById('f-birthday');
-        var ns='none';
-        document.querySelectorAll('[data-s]').forEach(function(b){
-          if(b.className.indexOf('sabo')!==-1) ns='abo';
-          else if(b.className.indexOf('spc')!==-1) ns='pc';
-        });
-        people.unshift({
-          id:nextId(), name:name,
-          memo:memo?memo.value.trim():'',
-          status:ns, flags:[],
-          reminder:rem?rem.value||null:null,
-          lastContact:todayStr(),
-          makerDate:mk?mk.value||null:null,
-          birthday:bd?bd.value||null:null,
-          lectures:lecs, logs:[]
-        });
-        saveToSheet(people[0]);
-        closeSheet();
-        if(callback) callback(name);
-        render();
-        toast(name+' を追加しました ✓');
-      };
-    }
-  }, 100);
+  // MAP画面の上にオーバーレイで新規追加フォームを表示
+  var existing = document.getElementById('map-new-overlay');
+  if(existing) existing.remove();
+
+  var mapDateEl = document.getElementById('map-date');
+  var dateStr = mapDateEl && mapDateEl.value
+    ? (function(){ var d=new Date(mapDateEl.value); return (d.getMonth()+1)+'/'+d.getDate(); })()
+    : (function(){ var n=new Date(); return (n.getMonth()+1)+'/'+n.getDate(); })();
+
+  var ov = document.createElement('div');
+  ov.id = 'map-new-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:600;background:var(--bg);overflow-y:auto';
+
+  var lecsHTML = LECS.map(function(l){
+    return '<div><div class="llabel">'+l+'</div>'
+      +'<input class="efield mnov-lec" type="date" data-lec="'+l+'" style="padding:8px 10px;font-size:13px"></div>';
+  }).join('');
+
+  ov.innerHTML =
+    '<div style="background:var(--surface);padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">'
+    +'<button id="mnov-close" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);font-size:18px;cursor:pointer">✕</button>'
+    +'<div style="font-size:17px;font-weight:700">新規追加</div>'
+    +'</div>'
+    +'<div style="padding:20px">'
+    +'<input class="efield" id="mnov-name" placeholder="名前" value="'+item.name+'" style="font-size:20px;font-weight:700;padding:6px 10px;margin-bottom:8px">'
+    +'<textarea class="efield" id="mnov-memo" rows="2" placeholder="メモ" style="font-size:12px;resize:none;line-height:1.5;color:var(--ink2)"></textarea>'
+    +'<div class="ssec"><div class="erow"><div class="elabel">登録状況</div>'
+    +'<div class="spicker">'
+    +'<button class="sbtn snone active" data-s="none" id="mnov-s-none">未登録</button>'
+    +'<button class="sbtn" data-s="pc" id="mnov-s-pc">PC</button>'
+    +'<button class="sbtn" data-s="abo" id="mnov-s-abo">ABO</button>'
+    +'</div></div>'
+    +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="mnov-reminder"></div>'
+    +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="mnov-birthday"></div>'
+    +'</div>'
+    +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lecsHTML+'</div></div>'
+    +'<div style="padding:0 0 20px">'
+    +'<button id="mnov-save" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">追加する</button>'
+    +'</div></div>';
+
+  document.body.appendChild(ov);
+
+  var curStatus = 'none';
+  ov.querySelectorAll('[data-s]').forEach(function(btn){
+    btn.onclick = function(){
+      curStatus = btn.dataset.s;
+      ov.querySelectorAll('[data-s]').forEach(function(b){ b.className = b.className.replace(' s'+b.dataset.s,''); });
+      btn.className += ' s'+curStatus;
+    };
+  });
+
+  document.getElementById('mnov-close').onclick = function(){ ov.remove(); };
+
+  document.getElementById('mnov-save').onclick = function(){
+    var name = document.getElementById('mnov-name').value.trim();
+    if(!name){ toast('名前を入力してください'); return; }
+    var lecs = {};
+    LECS.forEach(function(l){ lecs[l]=null; });
+    ov.querySelectorAll('.mnov-lec').forEach(function(el){
+      lecs[el.dataset.lec] = el.value ? el.value.replace(/-/g,'/') : null;
+    });
+    var memo = document.getElementById('mnov-memo').value.trim();
+    var rem = document.getElementById('mnov-reminder').value || null;
+    var bd = document.getElementById('mnov-birthday').value || null;
+
+    // テキストエリアの編集内容を取得
+    var infoTa = document.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+unidx+'"]');
+    var infoText = infoTa ? infoTa.value.trim() : '';
+
+    var newPerson = {
+      id:nextId(), name:name, memo:memo,
+      status:curStatus, flags:[],
+      reminder:rem, lastContact:todayStr(),
+      makerDate:null, birthday:bd,
+      lectures:lecs,
+      logs: infoText ? [{date:dateStr, text:'MAP: '+infoText}] : []
+    };
+    people.unshift(newPerson);
+    saveToSheet(newPerson);
+    ov.remove();
+    if(callback) callback(name);
+    render();
+    toast(name+' を追加しました ✓');
+  };
 }
 
 
