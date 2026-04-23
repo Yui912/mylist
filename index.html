@@ -353,10 +353,20 @@ function cHTML(p){
     var bdLabel=dbd===0?'🎂 今日！':dbd===1?'🎂 明日':dbd===-1?'🎂 昨日':'🎂 '+(parseInt(parts[1]))+'/'+(parseInt(parts[2]));
     bdStr='<div class="mitem" style="color:#E8A030;font-weight:600">'+bdLabel+'</div>';
   }
+  var naStr='';
+  if(p.nextApo){
+    var today2=new Date();today2.setHours(0,0,0,0);
+    var naDate=new Date(p.nextApo);naDate.setHours(0,0,0,0);
+    if(naDate>=today2){
+      var dna=Math.round((naDate-today2)/86400000);
+      var naLabel=dna===0?'📌 今日アポ！':dna===1?'📌 明日アポ':'📌 '+(naDate.getMonth()+1)+'/'+(naDate.getDate());
+      naStr='<div class="mitem" style="color:#4A90D9;font-weight:600">'+naLabel+'</div>';
+    }
+  }
   return '<div class="'+cls+'" onclick="openDetail('+p.id+')">'
     +'<div class="ctop"><div style="flex:1;min-width:0"><div class="cname">'+p.name+'</div>'+mm+'</div>'
     +'<div class="cbadges">'+sb+fb+'</div></div>'
-    +'<div class="cmeta">'+ls+bdStr+rt+'</div>'+lc+'</div>';
+    +'<div class="cmeta">'+naStr+ls+bdStr+rt+'</div>'+lc+'</div>';
 }
 
 function openDetail(id){
@@ -1056,14 +1066,14 @@ function showMapResult(result){
           +'<div style="font-size:14px;font-weight:700">'+item.name+'</div>'
           +(p2?'<button class="mdb" data-pid="'+p2.id+'" style="padding:3px 10px;font-size:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;cursor:pointer;color:var(--ink2)">詳細を見る</button>':'')
           +'</div>'
-          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">既存メモ</div>'
-          +'<textarea class="efield mme" data-key="'+key+'" data-field="memoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+memoText+'</textarea>'
-          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">読み取り内容</div>'
-          +'<textarea class="efield mie" data-key="'+key+'" data-field="infoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+infoText+'</textarea>'
           +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📌 次アポ日</div>'
           +'<input type="date" class="efield mnae" data-key="'+key+'" data-field="nextApo" value="'+recNextApo+'" style="font-size:12px;padding:6px 8px;margin-bottom:6px;width:100%">'
           +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📅 リマインド日</div>'
-          +'<input type="date" class="efield mre" data-key="'+key+'" data-field="reminder" value="'+reminder+'" style="font-size:12px;padding:6px 8px;margin-bottom:10px;width:100%">'
+          +'<input type="date" class="efield mre" data-key="'+key+'" data-field="reminder" value="'+reminder+'" style="font-size:12px;padding:6px 8px;margin-bottom:6px;width:100%">'
+          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">既存メモ</div>'
+          +'<textarea class="efield mme" data-key="'+key+'" data-field="memoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+memoText+'</textarea>'
+          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">読み取り内容</div>'
+          +'<textarea class="efield mie" data-key="'+key+'" data-field="infoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:10px;width:100%">'+infoText+'</textarea>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
           +'<button class="mab" data-key="'+key+'" data-action="update" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='update'?'var(--accent)':'var(--surface2)')+';color:'+(action==='update'?'white':'var(--ink2)')+'">更新</button>'
           +'<button class="mab" data-key="'+key+'" data-action="append" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='append'?'var(--green)':'var(--surface2)')+';color:'+(action==='append'?'white':'var(--ink2)')+'">追記</button>'
@@ -1100,14 +1110,14 @@ function showMapResult(result){
             +'<div style="font-size:12px;color:var(--green);font-weight:600">→ '+assignedP.name+'</div>'
             +'<button class="mdb" data-pid="'+assignedP.id+'" style="padding:3px 10px;font-size:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;cursor:pointer;color:var(--ink2)">詳細を見る</button>'
             +'</div>'
-            +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">既存メモ</div>'
-            +'<textarea class="efield mme" data-key="'+key+'" data-field="memoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+memoText+'</textarea>'
-            +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">読み取り内容</div>'
-            +'<textarea class="efield mie" data-key="'+key+'" data-field="infoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+infoText+'</textarea>'
             +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📌 次アポ日</div>'
             +'<input type="date" class="efield mnae" data-key="'+key+'" data-field="nextApo" value="'+getVal(key,'nextApo',(assignedP?assignedP.nextApo||'':'')).replace(/\//g,'-')+'" style="font-size:12px;padding:6px 8px;margin-bottom:6px;width:100%">'
             +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">📅 リマインド日</div>'
-            +'<input type="date" class="efield mre" data-key="'+key+'" data-field="reminder" value="'+reminder+'" style="font-size:12px;padding:6px 8px;margin-bottom:10px;width:100%">'
+            +'<input type="date" class="efield mre" data-key="'+key+'" data-field="reminder" value="'+reminder+'" style="font-size:12px;padding:6px 8px;margin-bottom:6px;width:100%">'
+            +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">既存メモ</div>'
+            +'<textarea class="efield mme" data-key="'+key+'" data-field="memoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:6px;width:100%">'+memoText+'</textarea>'
+            +'<div style="font-size:11px;color:var(--ink3);margin-bottom:3px">読み取り内容</div>'
+            +'<textarea class="efield mie" data-key="'+key+'" data-field="infoText" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:10px;width:100%">'+infoText+'</textarea>'
             +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
             +'<button class="mab" data-key="'+key+'" data-action="update" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='update'?'var(--accent)':'var(--surface2)')+';color:'+(action==='update'?'white':'var(--ink2)')+'">更新</button>'
             +'<button class="mab" data-key="'+key+'" data-action="append" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='append'?'var(--green)':'var(--surface2)')+';color:'+(action==='append'?'white':'var(--ink2)')+'">追記</button>'
