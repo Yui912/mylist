@@ -387,11 +387,20 @@ function dHTML(p){
     +'<button class="sbtn'+ss('abo')+'" data-s="abo">ABO</button>'
     +'</div></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div>'
-    +'<input class="efield" type="date" id="f-reminder" value="'+(p.reminder||'')+'"></div>'
-    +'<div class="erow"><div class="elabel">📣 マーケ日</div>'
-    +'<input class="efield" type="date" id="f-maker" value="'+(p.makerDate?p.makerDate.replace(/\//g,'-'):'')+'"></div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-reminder" value="'+(p.reminder||'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-reminder" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
+    +'<div class="erow"><div class="elabel">📣 マケ日</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-maker" value="'+(p.makerDate?p.makerDate.replace(/\//g,'-'):'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-maker" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
     +'<div class="erow"><div class="elabel">🎂 誕生日</div>'
-    +'<input class="efield" type="date" id="f-birthday" value="'+(p.birthday||'')+'"></div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input class="efield" type="date" id="f-birthday" value="'+(p.birthday||'')+'" style="flex:1">'
+    +'<button class="clr-btn" data-target="f-birthday" style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink3);font-size:14px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div></div>'
     +'<div class="erow"><div class="elabel">フラグ</div>'
     +'<div class="fwrap" id="fwrap">'+fb+'<button class="fadd" id="btn-fadd">＋</button></div></div></div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
@@ -431,6 +440,12 @@ function bindDetail(){
     saveToSheet(p);
   }
 
+  document.querySelectorAll('.clr-btn').forEach(function(btn){
+    btn.onclick=function(){
+      var el=document.getElementById(btn.dataset.target);
+      if(el){ el.value=''; save(); }
+    };
+  });
   var fn=document.getElementById('f-name');if(fn)fn.addEventListener('input',save);
   var fm=document.getElementById('f-memo');if(fm)fm.addEventListener('input',save);
   var fr=document.getElementById('f-reminder');if(fr)fr.addEventListener('change',save);
@@ -583,7 +598,7 @@ function openAdd(){
     +'<button class="sbtn" data-s="abo">ABO</button>'
     +'</div></div>'
     +'<div class="erow"><div class="elabel">📅 リマインド日</div><input class="efield" type="date" id="f-reminder"></div>'
-    +'<div class="erow"><div class="elabel">📣 マーケ日</div><input class="efield" type="date" id="f-maker"></div>'
+    +'<div class="erow"><div class="elabel">📣 マケ日</div><input class="efield" type="date" id="f-maker"></div>'
     +'<div class="erow"><div class="elabel">🎂 誕生日</div><input class="efield" type="date" id="f-birthday"></div>'
     +'<div class="erow"><div class="elabel">フラグ</div>'
     +'<div class="fwrap" id="add-fwrap">'+allFlags.map(function(f){return '<button class="fbtn" data-flag="'+f+'">'+f+'</button>';}).join('')+'<button class="fadd" id="add-fadd">＋</button></div></div>'
