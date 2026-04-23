@@ -249,6 +249,8 @@ function getList(){
     for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t;}
   } else if(curFilter==='independent'){
     list=list.filter(function(p){return p.flags.includes('独立')});
+  } else if(curFilter==='naoi'){
+    list=list.filter(function(p){return p.flags.includes('直以外')});
   } else if(curFilter==='noapproach'){
     list=list.filter(function(p){return p.flags.includes('アプローチしない')});
   } else {
@@ -322,6 +324,9 @@ function render(){
     list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='independent'){
     html+='<div class="slabel">独立</div>';
+    list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='naoi'){
+    html+='<div class="slabel">直以外</div>';
     list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='noapproach'){
     html+='<div class="slabel">アプローチしない</div>';
@@ -474,7 +479,9 @@ function bindDetail(){
   });
 
   function bindFlags(){
-    document.querySelectorAll('[data-flag]').forEach(function(btn){
+    var fwrap=document.getElementById('fwrap');
+    if(!fwrap) return;
+    fwrap.querySelectorAll('[data-flag]').forEach(function(btn){
       btn.onclick=function(){
         var f=btn.dataset.flag;
         var idx=p.flags.indexOf(f);
@@ -499,18 +506,8 @@ function bindDetail(){
         render();
       });
     };
-}
-    checked.forEach(function(c){ idxs.push(parseInt(c.dataset.idx)); });
-    if(!idxs.length) return;
-    if(!confirm(idxs.length+'件の履歴を削除しますか？')) return;
-    idxs.sort(function(a,b){ return b-a; }).forEach(function(i){ p.logs.splice(i,1); });
-    saveToSheet(p);
-    refreshLogs();
-    if(selCount) selCount.textContent = '';
-    if(delBtn) delBtn.style.display = 'none';
-    toast(idxs.length+'件削除しました');
-  };
 
+}
 function openAdd(){
   curP=null;
   var lg=LECS.map(function(l){
@@ -794,6 +791,9 @@ function renderList(){
     list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='independent'){
     html+='<div class="slabel">独立</div>';
+    list.forEach(function(p){html+=cHTML(p)});
+  } else if(curFilter==='naoi'){
+    html+='<div class="slabel">直以外</div>';
     list.forEach(function(p){html+=cHTML(p)});
   } else if(curFilter==='noapproach'){
     html+='<div class="slabel">アプローチしない</div>';
@@ -1620,6 +1620,7 @@ if(window.location.hash === '#map'){
 } else {
   loadFromSheet();
 }
-</script>
+
+}</script>
 </body>
 </html>
