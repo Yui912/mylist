@@ -513,65 +513,47 @@ function bindDetail(){
     closeSheet();render();toast(p.name+' を削除しました');
   };
   // ログ関連
+  var logList = document.getElementById('log-list');
+  var selCount = document.getElementById('log-sel-count');
+  var delBtn = document.getElementById('btn-log-del');
+
   function refreshLogs(){
-    document.getElementById('log-list').innerHTML = renderLogsHTML(p.logs);
-    bindLogEvents();
+    if(logList) logList.innerHTML = renderLogsHTML(p.logs);
   }
 
-  function bindLogEvents(){
-    var logList = document.getElementById('log-list');
-    if(!logList) return;
-    var selCount = document.getElementById('log-sel-count');
-    var delBtn = document.getElementById('btn-log-del');
-
-    // 毎回新しいonclick/onchangeを設定（上書きで重複防止）
+  if(logList){
     logList.onclick = function(e){
-      var target = e.target;
-
-      // 編集ボタン
-      if(target.classList.contains('ledit-btn') && target.dataset.idx !== undefined && !target.classList.contains('log-save-btn') && !target.classList.contains('log-cancel-btn')){
-        var idx = parseInt(target.dataset.idx);
-        var item = logList.querySelector('.litem[data-idx="'+idx+'"]');
-        var log = p.logs[idx];
+      var t = e.target;
+      if(t.classList.contains('ledit-btn') && !t.classList.contains('log-save-btn') && !t.classList.contains('log-cancel-btn')){
+        var i = parseInt(t.dataset.idx);
+        var item = logList.querySelector('.litem[data-idx="'+i+'"]');
+        var log = p.logs[i];
         var yr = new Date().getFullYear();
-        var parts = log.date.split('/');
-        var mo = ('0'+parts[0]).slice(-2);
-        var dy = ('0'+parts[1]).slice(-2);
-        var dateVal = yr+'-'+mo+'-'+dy;
+        var pts = log.date.split('/');
+        var dateVal = yr+'-'+('0'+pts[0]).slice(-2)+'-'+('0'+pts[1]).slice(-2);
         item.innerHTML =
           '<input type="date" class="efield log-edit-date" value="'+dateVal+'" style="width:130px;flex-shrink:0;font-size:12px;padding:5px 6px">'
-          +'<textarea class="log-edit-area" rows="2" style="flex:1">'+log.text+'</textarea>'
+          +'<textarea class="log-edit-area" rows="2" style="flex:1;font-size:13px;border:1.5px solid var(--accent);border-radius:8px;padding:6px;resize:none;font-family:inherit">'+log.text+'</textarea>'
           +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
-          +'<button class="ledit-btn log-save-btn" data-idx="'+idx+'">💾</button>'
-          +'<button class="ledit-btn log-cancel-btn" data-idx="'+idx+'">✕</button>'
+          +'<button class="ledit-btn log-save-btn" data-idx="'+i+'">💾</button>'
+          +'<button class="ledit-btn log-cancel-btn" data-idx="'+i+'">✕</button>'
           +'</div>';
-        return;
-      }
-
-      // 保存ボタン
-      if(target.classList.contains('log-save-btn')){
-        var idx = parseInt(target.dataset.idx);
-        var item = logList.querySelector('.litem[data-idx="'+idx+'"]');
-        var newDate = item.querySelector('.log-edit-date').value;
-        var d = new Date(newDate);
-        var ds = (d.getMonth()+1)+'/'+d.getDate();
-        var newText = item.querySelector('.log-edit-area').value.trim();
-        if(!newText) return;
-        p.logs[idx] = {date:ds, text:newText};
+      } else if(t.classList.contains('log-save-btn')){
+        var i = parseInt(t.dataset.idx);
+        var item = logList.querySelector('.litem[data-idx="'+i+'"]');
+        var nd = item.querySelector('.log-edit-date').value;
+        var dd = new Date(nd);
+        var ds = (dd.getMonth()+1)+'/'+dd.getDate();
+        var nt = item.querySelector('.log-edit-area').value.trim();
+        if(!nt) return;
+        p.logs[i] = {date:ds, text:nt};
         saveToSheet(p);
         refreshLogs();
         toast('更新しました ✓');
-        return;
-      }
-
-      // キャンセルボタン
-      if(target.classList.contains('log-cancel-btn')){
+      } else if(t.classList.contains('log-cancel-btn')){
         refreshLogs();
-        return;
       }
     };
-
-    // onchangeで上書き（重複防止）
     logList.onchange = function(e){
       if(e.target.classList.contains('lchk')){
         var sel = logList.querySelectorAll('.lchk:checked').length;
@@ -581,35 +563,34 @@ function bindDetail(){
     };
   }
 
-  var ladd=document.getElementById('btn-ladd');
-  if(ladd)ladd.onclick=function(){
-    var inp=document.getElementById('f-log');
-    var dateInp=document.getElementById('f-log-date');
-    var text=inp.value.trim();if(!text)return;
-    var d = dateInp && dateInp.value ? new Date(dateInp.value) : new Date();
+  var ladd = document.getElementById('btn-ladd');
+  if(ladd) ladd.onclick = function(){
+    var inp = document.getElementById('f-log');
+    var di = document.getElementById('f-log-date');
+    var text = inp.value.trim();
+    if(!text) return;
+    var d = di && di.value ? new Date(di.value) : new Date();
     var ds = (d.getMonth()+1)+'/'+d.getDate();
-    p.logs.unshift({date:ds,text:text});
-    inp.value='';
-    refreshLogs();
+    p.logs.unshift({date:ds, text:text});
+    inp.value = '';
+    if(logList) logList.innerHTML = renderLogsHTML(p.logs);
     saveToSheet(p);
     toast('追加しました ✓');
   };
 
-  var logDelBtn = document.getElementById('btn-log-del');
-  if(logDelBtn) logDelBtn.onclick = function(){
-    var logList2 = document.getElementById('log-list');
-    var checked = logList2 ? logList2.querySelectorAll('.lchk:checked') : [];
+  if(delBtn) delBtn.onclick = function(){
+    var checked = logList ? logList.querySelectorAll('.lchk:checked') : [];
     var idxs = [];
     checked.forEach(function(c){ idxs.push(parseInt(c.dataset.idx)); });
     if(!idxs.length) return;
     if(!confirm(idxs.length+'件の履歴を削除しますか？')) return;
-    idxs.sort(function(a,b){return b-a;}).forEach(function(i){ p.logs.splice(i,1); });
+    idxs.sort(function(a,b){ return b-a; }).forEach(function(i){ p.logs.splice(i,1); });
     saveToSheet(p);
     refreshLogs();
+    if(selCount) selCount.textContent = '';
+    if(delBtn) delBtn.style.display = 'none';
     toast(idxs.length+'件削除しました');
   };
-
-  bindLogEvents();
 }
 
 function openAdd(){
