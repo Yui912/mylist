@@ -242,7 +242,7 @@ function getList(){
   } else if(curFilter==='noapproach'){
     list=list.filter(function(p){return p.flags.includes('アプローチしない')});
   } else {
-    var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
+    var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'&&f!=='独立'&&f!=='直以外'});
     if(customFlags.includes(curFilter)){
       list=list.filter(function(p){return p.flags.includes(curFilter)});
     }
@@ -721,7 +721,7 @@ function renderChips(){
     return (next-now)/86400000<=30;
   }).length;
 
-  var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'});
+  var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'&&f!=='独立'&&f!=='直以外'});
   var nac=people.filter(function(p){return p.flags.includes('アプローチしない')}).length;
 
   function chip(f,label,dot){
