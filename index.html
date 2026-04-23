@@ -519,50 +519,64 @@ function bindDetail(){
   }
 
   function bindLogEvents(){
-    var chks = document.querySelectorAll('.lchk');
+    var logList = document.getElementById('log-list');
     var selCount = document.getElementById('log-sel-count');
     var delBtn = document.getElementById('btn-log-del');
 
-    chks.forEach(function(chk){
-      chk.onchange = function(){
-        var sel = document.querySelectorAll('.lchk:checked').length;
-        if(selCount) selCount.textContent = sel ? sel+'件選択中' : '';
-        if(delBtn) delBtn.style.display = sel ? 'block' : 'none';
-      };
-    });
+    // イベント委譲でlog-list全体を監視
+    logList.onclick = function(e){
+      var target = e.target;
 
-    // 編集ボタン
-    document.querySelectorAll('.ledit-btn').forEach(function(btn){
-      btn.onclick = function(){
-        var idx = parseInt(btn.dataset.idx);
-        var item = document.querySelector('.litem[data-idx="'+idx+'"]');
+      // 編集ボタン
+      if(target.classList.contains('ledit-btn') && target.dataset.idx !== undefined && !target.classList.contains('log-save-btn') && !target.classList.contains('log-cancel-btn')){
+        var idx = parseInt(target.dataset.idx);
+        var item = logList.querySelector('.litem[data-idx="'+idx+'"]');
         var log = p.logs[idx];
-        var dateVal = log.date.replace(/(\d+)\/(\d+)/, function(m,mo,d){
-          return new Date().getFullYear()+'-'+('0'+mo).slice(-2)+'-'+('0'+d).slice(-2);
-        });
+        var yr = new Date().getFullYear();
+        var parts = log.date.split('/');
+        var mo = ('0'+parts[0]).slice(-2);
+        var dy = ('0'+parts[1]).slice(-2);
+        var dateVal = yr+'-'+mo+'-'+dy;
         item.innerHTML =
           '<input type="date" class="efield log-edit-date" value="'+dateVal+'" style="width:130px;flex-shrink:0;font-size:12px;padding:5px 6px">'
-          +'<textarea class="log-edit-area" rows="2">'+log.text+'</textarea>'
+          +'<textarea class="log-edit-area" rows="2" style="flex:1">'+log.text+'</textarea>'
           +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
-          +'<button class="ledit-btn log-save-btn" data-idx="'+idx+'" title="保存">💾</button>'
-          +'<button class="ledit-btn log-cancel-btn" data-idx="'+idx+'" title="キャンセル">✕</button>'
+          +'<button class="ledit-btn log-save-btn" data-idx="'+idx+'">💾</button>'
+          +'<button class="ledit-btn log-cancel-btn" data-idx="'+idx+'">✕</button>'
           +'</div>';
+        return;
+      }
 
-        item.querySelector('.log-save-btn').onclick = function(){
-          var newDate = item.querySelector('.log-edit-date').value;
-          var d = new Date(newDate);
-          var ds = (d.getMonth()+1)+'/'+d.getDate();
-          var newText = item.querySelector('.log-edit-area').value.trim();
-          if(!newText) return;
-          p.logs[idx] = {date:ds, text:newText};
-          saveToSheet(p);
-          refreshLogs();
-          toast('更新しました ✓');
-        };
-        item.querySelector('.log-cancel-btn').onclick = function(){
-          refreshLogs();
-        };
-      };
+      // 保存ボタン
+      if(target.classList.contains('log-save-btn')){
+        var idx = parseInt(target.dataset.idx);
+        var item = logList.querySelector('.litem[data-idx="'+idx+'"]');
+        var newDate = item.querySelector('.log-edit-date').value;
+        var d = new Date(newDate);
+        var ds = (d.getMonth()+1)+'/'+d.getDate();
+        var newText = item.querySelector('.log-edit-area').value.trim();
+        if(!newText) return;
+        p.logs[idx] = {date:ds, text:newText};
+        saveToSheet(p);
+        refreshLogs();
+        toast('更新しました ✓');
+        return;
+      }
+
+      // キャンセルボタン
+      if(target.classList.contains('log-cancel-btn')){
+        refreshLogs();
+        return;
+      }
+    };
+
+    // チェックボックス変更はchangeイベント委譲
+    logList.addEventListener('change', function(e){
+      if(e.target.classList.contains('lchk')){
+        var sel = logList.querySelectorAll('.lchk:checked').length;
+        if(selCount) selCount.textContent = sel ? sel+'件選択中' : '';
+        if(delBtn) delBtn.style.display = sel ? 'inline-block' : 'none';
+      }
     });
   }
 
