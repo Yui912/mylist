@@ -350,17 +350,6 @@ function openDetail(id){
 }
 
 
-function renderLogsHTML(logs){
-  if(!logs||!logs.length) return '<div style="color:var(--ink3);font-size:13px;padding:8px">まだ記録がありません</div>';
-  return logs.map(function(l,i){
-    return '<div class="litem" data-idx="'+i+'">'
-      +'<input type="checkbox" class="lchk" data-idx="'+i+'">'
-      +'<div class="ldate">'+l.date+'</div>'
-      +'<div class="ltext">'+l.text+'</div>'
-      +'<button class="ledit-btn" data-idx="'+i+'" title="編集">✏️</button>'
-      +'</div>';
-  }).join('');
-}
 
 function dHTML(p){
   var lg=LECS.map(function(l){
@@ -404,17 +393,6 @@ function dHTML(p){
     +'<div class="erow"><div class="elabel">フラグ</div>'
     +'<div class="fwrap" id="fwrap">'+fb+'<button class="fadd" id="btn-fadd">＋</button></div></div></div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
-    +'<div class="ssec"><div class="ssec-title">コミュニケーション履歴</div>'
-    +'<div class="larow">'
-    +'<input class="efield" type="date" id="f-log-date" value="'+new Date().toISOString().split('T')[0]+'" style="width:130px;flex-shrink:0;font-size:12px;padding:6px 8px">'
-    +'<input class="linput" id="f-log" placeholder="内容を入力…" style="flex:1">'
-    +'<button class="lsubmit" id="btn-ladd">追加</button>'
-    +'</div>'
-    +'<div class="log-toolbar">'
-    +'<span id="log-sel-count" style="font-size:12px;color:var(--ink3)"></span>'
-    +'<button id="btn-log-del" style="display:none;font-size:12px;color:#C8472B;background:none;border:none;cursor:pointer;font-weight:700">選択削除</button>'
-    +'</div>'
-    +'<div id="log-list">'+li+'</div></div>'
     +'<div class="ssec"><button id="btn-delete" style="width:100%;padding:13px;background:white;color:#C8472B;border:1.5px solid #C8472B;border-radius:12px;font-size:14px;font-weight:700;font-family:sans-serif;cursor:pointer">この人を削除する</button></div>';
 }
 
@@ -488,86 +466,7 @@ function bindDetail(){
         render();
       });
     };
-  }
-  bindFlags();
-
-  var bdel=document.getElementById('btn-delete');
-  if(bdel)bdel.onclick=function(){
-    if(!confirm('本当に削除する？'))return;
-    people=people.filter(function(x){return x.id!==p.id});
-    fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'delete',id:p.id})})
-      .catch(function(e){console.error('delete error',e)});
-    closeSheet();render();toast(p.name+' を削除しました');
-  };
-  // ログ関連
-  var logList = document.getElementById('log-list');
-  var selCount = document.getElementById('log-sel-count');
-  var delBtn = document.getElementById('btn-log-del');
-
-  function refreshLogs(){
-    if(logList) logList.innerHTML = renderLogsHTML(p.logs);
-  }
-
-  if(logList){
-    logList.onclick = function(e){
-      var t = e.target;
-      if(t.classList.contains('ledit-btn') && !t.classList.contains('log-save-btn') && !t.classList.contains('log-cancel-btn')){
-        var i = parseInt(t.dataset.idx);
-        var item = logList.querySelector('.litem[data-idx="'+i+'"]');
-        var log = p.logs[i];
-        var yr = new Date().getFullYear();
-        var pts = log.date.split('/');
-        var dateVal = yr+'-'+('0'+pts[0]).slice(-2)+'-'+('0'+pts[1]).slice(-2);
-        item.innerHTML =
-          '<input type="date" class="efield log-edit-date" value="'+dateVal+'" style="width:130px;flex-shrink:0;font-size:12px;padding:5px 6px">'
-          +'<textarea class="log-edit-area" rows="2" style="flex:1;font-size:13px;border:1.5px solid var(--accent);border-radius:8px;padding:6px;resize:none;font-family:inherit">'+log.text+'</textarea>'
-          +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
-          +'<button class="ledit-btn log-save-btn" data-idx="'+i+'">💾</button>'
-          +'<button class="ledit-btn log-cancel-btn" data-idx="'+i+'">✕</button>'
-          +'</div>';
-      } else if(t.classList.contains('log-save-btn')){
-        var i = parseInt(t.dataset.idx);
-        var item = logList.querySelector('.litem[data-idx="'+i+'"]');
-        var nd = item.querySelector('.log-edit-date').value;
-        var dd = new Date(nd);
-        var ds = (dd.getMonth()+1)+'/'+dd.getDate();
-        var nt = item.querySelector('.log-edit-area').value.trim();
-        if(!nt) return;
-        p.logs[i] = {date:ds, text:nt};
-        saveToSheet(p);
-        refreshLogs();
-        toast('更新しました ✓');
-      } else if(t.classList.contains('log-cancel-btn')){
-        refreshLogs();
-      }
-    };
-    logList.onchange = function(e){
-      if(e.target.classList.contains('lchk')){
-        var sel = logList.querySelectorAll('.lchk:checked').length;
-        if(selCount) selCount.textContent = sel ? sel+'件選択中' : '';
-        if(delBtn) delBtn.style.display = sel ? 'inline-block' : 'none';
-      }
-    };
-  }
-
-  var ladd = document.getElementById('btn-ladd');
-  if(ladd) ladd.onclick = function(){
-    var inp = document.getElementById('f-log');
-    var di = document.getElementById('f-log-date');
-    var text = inp.value.trim();
-    if(!text) return;
-    var d = di && di.value ? new Date(di.value) : new Date();
-    var ds = (d.getMonth()+1)+'/'+d.getDate();
-    p.logs.unshift({date:ds, text:text});
-    inp.value = '';
-    if(logList) logList.innerHTML = renderLogsHTML(p.logs);
-    saveToSheet(p);
-    toast('追加しました ✓');
-  };
-
-  if(delBtn) delBtn.onclick = function(){
-    var checked = logList ? logList.querySelectorAll('.lchk:checked') : [];
-    var idxs = [];
+}
     checked.forEach(function(c){ idxs.push(parseInt(c.dataset.idx)); });
     if(!idxs.length) return;
     if(!confirm(idxs.length+'件の履歴を削除しますか？')) return;
@@ -578,7 +477,6 @@ function bindDetail(){
     if(delBtn) delBtn.style.display = 'none';
     toast(idxs.length+'件削除しました');
   };
-}
 
 function openAdd(){
   curP=null;
@@ -1050,24 +948,17 @@ var mapSelections = {};
 function showMapResult(result){
   mapLocked = true;
   mapSelections = {};
-  // 解析結果をlocalStorageに保存
+
   try { localStorage.setItem('map_result_cache', JSON.stringify(result)); } catch(e){}
 
-  if(result.unrecognized && result.unrecognized.length && typeof result.unrecognized[0] === 'string'){
-    result.unrecognized = result.unrecognized.map(function(name){
-      return {name:name,pv:null,pv_current:null,pv_target:null,actions:[],memo:''};
-    });
-  }
-  if(result.people && result.people.length && typeof result.people[0] === 'string'){
-    result.people = result.people.map(function(name){
-      return {name:name,pv:null,pv_current:null,pv_target:null,actions:[],memo:''};
-    });
-  }
-
+  // resultsフォーマット対応
   var allResults = result.results || [];
   if(!allResults.length){
     allResults = (result.people||[]).map(function(p){ return Object.assign({known:true},p); })
-      .concat((result.unrecognized||[]).map(function(p){ return Object.assign({known:false},p); }));
+      .concat((result.unrecognized||[]).map(function(p){
+        if(typeof p==='string') return {name:p,known:false,pv_current:null,pv_target:null,actions:[],memo:''};
+        return Object.assign({known:false},p);
+      }));
   }
 
   var recItems = allResults.filter(function(item){ return item.known; });
@@ -1083,16 +974,6 @@ function showMapResult(result){
     dateStr = (now2.getMonth()+1)+'/'+now2.getDate();
   }
 
-  function makeLogText(item){
-    var parts = [];
-    if(item.pv) parts.push('PV: '+item.pv);
-    if(item.pv_current) parts.push('現PV: '+item.pv_current);
-    if(item.pv_target) parts.push('目標PV: '+item.pv_target);
-    if(item.actions && item.actions.length) parts.push('アクション: '+item.actions.join('、'));
-    if(item.memo) parts.push(item.memo);
-    return parts.join(' / ');
-  }
-
   function makeInfoText(item){
     var parts = [];
     if(item.pv_current) parts.push('現PV: '+item.pv_current);
@@ -1103,140 +984,240 @@ function showMapResult(result){
     return parts.join(' / ');
   }
 
-  function makeInfoHTML(item, type, idx){
-    var textVal = makeInfoText(item);
-    return '<textarea class="efield map-info-edit" data-type="'+type+'" data-idx="'+idx+'" rows="2" '
-      +'style="font-size:12px;resize:none;line-height:1.5;color:var(--ink2);margin-bottom:8px;width:100%">'+textVal+'</textarea>';
-  }
-
   function renderResults(){
     var section = document.getElementById('map-result');
     if(!section) return;
-    var scrollY = section.scrollTop;
+
     var html = '';
 
+    // 認識できた人
     if(recItems.length){
       html += '<div style="padding:12px 0 6px"><div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--ink3)">✅ 認識できた人（'+recItems.length+'人）</div></div>';
-      recItems.forEach(function(item,idx){
-        var sel = mapSelections['rec_'+idx];
+      recItems.forEach(function(item, idx){
+        var sel = mapSelections['rec_'+idx] || {};
+        var existingMemo = (people.find(function(p){ return p.name===item.name; })||{}).memo || '';
+        var infoText = sel.infoText !== undefined ? sel.infoText : makeInfoText(item);
+        var memoText = sel.memoText !== undefined ? sel.memoText : existingMemo;
+        var action = sel.action || '';
+
         html += '<div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid var(--border)">'
-          +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">'+item.name+'</div>'
-          +makeInfoHTML(item,'rec',idx)
-          +(sel
-            ? '<span style="font-size:12px;color:var(--green);font-weight:600">✓ ログに追加予定</span>'
-            : '<button data-type="rec" data-idx="'+idx+'" style="padding:6px 14px;background:var(--green);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">ログに追加</button>'
-          )+'</div>';
+          +'<div style="font-size:14px;font-weight:700;margin-bottom:8px">'+item.name+'</div>'
+          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">既存メモ</div>'
+          +'<textarea class="efield map-memo-edit" data-type="rec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:8px;width:100%">'+memoText+'</textarea>'
+          +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">読み取り内容</div>'
+          +'<textarea class="efield map-info-edit" data-type="rec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:10px;width:100%">'+infoText+'</textarea>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          +'<button class="map-action-btn'+(action==='update'?' map-action-on':'')+'" data-type="rec" data-idx="'+idx+'" data-action="update" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='update'?'var(--accent)':'var(--surface2)')+';color:'+(action==='update'?'white':'var(--ink2)')+'">更新</button>'
+          +'<button class="map-action-btn'+(action==='append'?' map-action-on':'')+'" data-type="rec" data-idx="'+idx+'" data-action="append" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='append'?'var(--green)':'var(--surface2)')+';color:'+(action==='append'?'white':'var(--ink2)')+'">追記</button>'
+          +'<button class="map-action-btn'+(action==='none'?' map-action-on':'')+'" data-type="rec" data-idx="'+idx+'" data-action="none" style="padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='none'?'var(--ink2)':'var(--surface2)')+';color:'+(action==='none'?'white':'var(--ink3)')+'">なし</button>'
+          +'</div>'
+          +'</div>';
       });
     }
 
+    // 確認が必要な人
     if(unrecItems.length){
       html += '<div style="padding:12px 0 6px"><div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--ink3)">❓ 確認が必要（'+unrecItems.length+'人）</div></div>';
-      unrecItems.forEach(function(item,idx){
-        var sel = mapSelections['unrec_'+idx];
+      unrecItems.forEach(function(item, idx){
+        var sel = mapSelections['unrec_'+idx] || {};
+        var infoText = sel.infoText !== undefined ? sel.infoText : makeInfoText(item);
         var candidates = people.filter(function(p){
           return p.name.indexOf(item.name)!==-1||item.name.indexOf(p.name)!==-1;
         }).slice(0,3);
 
-        var actionHTML;
-        if(sel){
-          if(sel.action==='log') actionHTML = '<span style="font-size:12px;color:var(--green);font-weight:600">✓ '+sel.name+' にログ追加予定</span>';
-          else if(sel.action==='naoi') actionHTML = '<span style="font-size:12px;color:#C07800;font-weight:600">直以外フラグ予定</span>';
-          else if(sel.action==='skip') actionHTML = '<span style="font-size:12px;color:var(--ink3)">記録しない</span>';
-          else if(sel.action==='new') actionHTML = '<span style="font-size:12px;color:var(--blue);font-weight:600">✓ '+sel.name+' として新規追加予定</span>';
-        } else {
-          var candBtns = candidates.map(function(p){
-            return '<button data-type="cand" data-idx="'+idx+'" data-pid="'+p.id+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'+p.name+'</button>';
-          }).join('');
-          actionHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">'
-            +candBtns
-            +'<button data-type="search" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">🔍 検索</button>'
-            +'<button data-type="new" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">＋ 新規</button>'
-            +'<button data-type="naoi" data-idx="'+idx+'" style="padding:5px 10px;background:#FEF3E2;border:1.5px solid #E8A030;border-radius:8px;font-size:12px;font-weight:600;color:#C07800;cursor:pointer">直以外</button>'
-            +'<button data-type="skip" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--ink3);cursor:pointer">記録しない</button>'
-            +'</div>';
-        }
+        var assignedPerson = sel.personId ? people.find(function(p){ return p.id===sel.personId; }) : null;
+        var memoText = sel.memoText !== undefined ? sel.memoText : (assignedPerson ? assignedPerson.memo || '' : '');
+        var action = sel.action || '';
+
+        var candBtns = candidates.map(function(p){
+          return '<button class="map-cand-btn" data-idx="'+idx+'" data-pid="'+p.id+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'+p.name+'</button>';
+        }).join('');
 
         html += '<div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid var(--border)">'
           +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">「'+item.name+'」</div>'
-          +makeInfoHTML(item,'unrec',idx)
-          +(sel?'':'<div style="font-size:11px;color:var(--ink3);margin-bottom:6px">誰ですか？</div>')
-          +actionHTML+'</div>';
+          +(assignedPerson
+            ? '<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px">→ '+assignedPerson.name+'</div>'
+              +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">既存メモ</div>'
+              +'<textarea class="efield map-memo-edit" data-type="unrec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:8px;width:100%">'+memoText+'</textarea>'
+              +'<div style="font-size:11px;color:var(--ink3);margin-bottom:4px">読み取り内容</div>'
+              +'<textarea class="efield map-info-edit" data-type="unrec" data-idx="'+idx+'" rows="2" style="font-size:12px;resize:none;line-height:1.5;margin-bottom:10px;width:100%">'+infoText+'</textarea>'
+              +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+              +'<button class="map-action-btn'+(action==='update'?' map-action-on':'')+'" data-type="unrec" data-idx="'+idx+'" data-action="update" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='update'?'var(--accent)':'var(--surface2)')+';color:'+(action==='update'?'white':'var(--ink2)')+'">更新</button>'
+              +'<button class="map-action-btn'+(action==='append'?' map-action-on':'')+'" data-type="unrec" data-idx="'+idx+'" data-action="append" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='append'?'var(--green)':'var(--surface2)')+';color:'+(action==='append'?'white':'var(--ink2)')+'">追記</button>'
+              +'<button class="map-action-btn'+(action==='none'?' map-action-on':'')+'" data-type="unrec" data-idx="'+idx+'" data-action="none" style="padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;border:1.5px solid var(--border);background:'+(action==='none'?'var(--ink2)':'var(--surface2)')+';color:'+(action==='none'?'white':'var(--ink3)')+'">なし</button>'
+              +'</div>'
+            : '<div style="font-size:11px;color:var(--ink3);margin-bottom:6px">読み取り内容: '+infoText+'</div>'
+              +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+              +candBtns
+              +'<button class="map-search-btn2" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">🔍 検索</button>'
+              +'<button class="map-new-btn2" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer">＋ 新規</button>'
+              +'<button class="map-naoi-btn2" data-idx="'+idx+'" style="padding:5px 10px;background:#FEF3E2;border:1.5px solid #E8A030;border-radius:8px;font-size:12px;font-weight:600;color:#C07800;cursor:pointer">直以外</button>'
+              +'<button class="map-skip-btn2" data-idx="'+idx+'" style="padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--ink3);cursor:pointer">記録しない</button>'
+              +'</div>'
+          )
+          +'</div>';
       });
+    }
+
+    if(!recItems.length && !unrecItems.length){
+      html = '<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">人物が検出されませんでした</div>';
     }
 
     html += '<div style="padding:8px 0 20px"><button id="btn-map-save" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">保存する</button></div>';
 
     section.innerHTML = html;
-    // 選択状態を保存
-    try { localStorage.setItem('map_selections_cache', JSON.stringify(mapSelections)); } catch(e){}
 
-    // イベントバインド
-    section.querySelectorAll('button[data-type]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var type = btn.dataset.type;
+    // テキストエリアの変更を即座にmapSelectionsに保存
+    section.querySelectorAll('.map-memo-edit').forEach(function(ta){
+      ta.oninput = function(){
+        var type = ta.dataset.type; var idx = parseInt(ta.dataset.idx);
+        var key = type+'_'+idx;
+        if(!mapSelections[key]) mapSelections[key] = {};
+        mapSelections[key].memoText = ta.value;
+      };
+    });
+    section.querySelectorAll('.map-info-edit').forEach(function(ta){
+      ta.oninput = function(){
+        var type = ta.dataset.type; var idx = parseInt(ta.dataset.idx);
+        var key = type+'_'+idx;
+        if(!mapSelections[key]) mapSelections[key] = {};
+        mapSelections[key].infoText = ta.value;
+      };
+    });
+
+    // アクションボタン
+    section.querySelectorAll('.map-action-btn').forEach(function(btn){
+      btn.onclick = function(){
+        var type = btn.dataset.type; var idx = parseInt(btn.dataset.idx); var action = btn.dataset.action;
+        var key = type+'_'+idx;
+        // 現在のテキストエリアの値を保存
+        var memoTa = section.querySelector('.map-memo-edit[data-type="'+type+'"][data-idx="'+idx+'"]');
+        var infoTa = section.querySelector('.map-info-edit[data-type="'+type+'"][data-idx="'+idx+'"]');
+        if(!mapSelections[key]) mapSelections[key] = {};
+        if(memoTa) mapSelections[key].memoText = memoTa.value;
+        if(infoTa) mapSelections[key].infoText = infoTa.value;
+        mapSelections[key].action = action;
+        renderResults();
+      };
+    });
+
+    // 候補者
+    section.querySelectorAll('.map-cand-btn').forEach(function(btn){
+      btn.onclick = function(){
         var idx = parseInt(btn.dataset.idx);
-        if(type==='rec'){
-          mapSelections['rec_'+idx] = {action:'log'};
+        var p2 = people.find(function(x){ return x.id===parseInt(btn.dataset.pid); });
+        if(!p2) return;
+        var infoTa = section.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+idx+'"]');
+        var infoText = infoTa ? infoTa.value : makeInfoText(unrecItems[idx]);
+        mapSelections['unrec_'+idx] = {personId:p2.id, infoText:infoText, memoText:p2.memo||'', action:''};
+        renderResults();
+      };
+    });
+
+    // 検索
+    section.querySelectorAll('.map-search-btn2').forEach(function(btn){
+      btn.onclick = function(){
+        var idx = parseInt(btn.dataset.idx);
+        var infoTa = section.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+idx+'"]');
+        var infoText = infoTa ? infoTa.value : makeInfoText(unrecItems[idx]);
+        openMapSearchOverlay(unrecItems[idx], idx, function(p2){
+          mapSelections['unrec_'+idx] = {personId:p2.id, infoText:infoText, memoText:p2.memo||'', action:''};
           renderResults();
-        } else if(type==='cand'){
-          var p = people.find(function(x){ return x.id===parseInt(btn.dataset.pid); });
-          if(p){ mapSelections['unrec_'+idx] = {action:'log', name:p.name, personId:p.id}; renderResults(); }
-        } else if(type==='naoi'){
-          mapSelections['unrec_'+idx] = {action:'naoi', name:unrecItems[idx].name};
+        });
+      };
+    });
+
+    // 新規
+    section.querySelectorAll('.map-new-btn2').forEach(function(btn){
+      btn.onclick = function(){
+        var idx = parseInt(btn.dataset.idx);
+        var infoTa = section.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+idx+'"]');
+        var infoText = infoTa ? infoTa.value : makeInfoText(unrecItems[idx]);
+        openMapNewOverlay(unrecItems[idx], idx, function(name){
+          var newP = people[0];
+          mapSelections['unrec_'+idx] = {personId:newP.id, infoText:infoText, memoText:newP.memo||'', action:''};
           renderResults();
-        } else if(type==='skip'){
-          mapSelections['unrec_'+idx] = {action:'skip'};
-          renderResults();
-        } else if(type==='search'){
-          openMapSearchOverlay(unrecItems[idx], idx, function(p){
-            mapSelections['unrec_'+idx] = {action:'log', name:p.name, personId:p.id};
-            renderResults();
-          });
-        } else if(type==='new'){
-          openMapNewOverlay(unrecItems[idx], idx, function(name){
-            mapSelections['unrec_'+idx] = {action:'new', name:name};
-            renderResults();
-          });
-        }
-      });
+        });
+      };
+    });
+
+    // 直以外
+    section.querySelectorAll('.map-naoi-btn2').forEach(function(btn){
+      btn.onclick = function(){
+        var idx = parseInt(btn.dataset.idx);
+        mapSelections['unrec_'+idx] = {action:'naoi', name:unrecItems[idx].name};
+        renderResults();
+      };
+    });
+
+    // 記録しない
+    section.querySelectorAll('.map-skip-btn2').forEach(function(btn){
+      btn.onclick = function(){
+        var idx = parseInt(btn.dataset.idx);
+        mapSelections['unrec_'+idx] = {action:'skip'};
+        renderResults();
+      };
     });
 
     // 保存ボタン
     var saveBtn = document.getElementById('btn-map-save');
-    if(saveBtn) saveBtn.addEventListener('click', function(){
+    if(saveBtn) saveBtn.onclick = function(){
       var saved = 0;
-      Object.keys(mapSelections).forEach(function(key){
-        var sel = mapSelections[key];
-        if(sel.action==='log'){
-          var item, p;
-          var editedText;
-          if(key.indexOf('rec_')===0){
-            item = recItems[parseInt(key.replace('rec_',''))];
-            p = people.find(function(x){ return x.name===item.name; });
-            var ta = document.querySelector('.map-info-edit[data-type="rec"][data-idx="'+parseInt(key.replace('rec_',''))+'"]');
-            editedText = ta ? ta.value.trim() : makeLogText(item);
-          } else {
-            item = unrecItems[parseInt(key.replace('unrec_',''))];
-            p = people.find(function(x){ return x.id===sel.personId; });
-            var ta = document.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+parseInt(key.replace('unrec_',''))+'"]');
-            editedText = ta ? ta.value.trim() : makeLogText(item);
-          }
-          if(p){ p.logs.unshift({date:dateStr, text:'MAP: '+editedText}); saveToSheet(p); saved++; }
-        } else if(sel.action==='naoi'){
-          var item2 = unrecItems[parseInt(key.replace('unrec_',''))];
-          var p2 = people.find(function(x){ return x.name===item2.name; });
-          if(p2 && !p2.flags.includes('直以外')){ p2.flags.push('直以外'); saveToSheet(p2); saved++; }
+
+      // 認識できた人
+      recItems.forEach(function(item, idx){
+        var sel = mapSelections['rec_'+idx];
+        if(!sel || !sel.action || sel.action === 'none') return;
+        var p2 = people.find(function(x){ return x.name===item.name; });
+        if(!p2) return;
+        var memoTa = section.querySelector('.map-memo-edit[data-type="rec"][data-idx="'+idx+'"]');
+        var infoTa = section.querySelector('.map-info-edit[data-type="rec"][data-idx="'+idx+'"]');
+        var memoVal = memoTa ? memoTa.value.trim() : (sel.memoText||'');
+        var infoVal = infoTa ? infoTa.value.trim() : (sel.infoText||'');
+        if(sel.action === 'update'){
+          p2.memo = infoVal;
+        } else if(sel.action === 'append'){
+          p2.memo = p2.memo ? p2.memo + '\n' + infoVal : infoVal;
         }
+        saveToSheet(p2);
+        saved++;
       });
+
+      // 確認が必要な人
+      unrecItems.forEach(function(item, idx){
+        var sel = mapSelections['unrec_'+idx];
+        if(!sel) return;
+        if(sel.action === 'naoi'){
+          var p2 = people.find(function(x){ return x.name===item.name; });
+          if(p2 && !p2.flags.includes('直以外')){ p2.flags.push('直以外'); saveToSheet(p2); saved++; }
+          return;
+        }
+        if(sel.action === 'skip' || !sel.personId) return;
+        var p2 = people.find(function(x){ return x.id===sel.personId; });
+        if(!p2) return;
+        var memoTa = section.querySelector('.map-memo-edit[data-type="unrec"][data-idx="'+idx+'"]');
+        var infoTa = section.querySelector('.map-info-edit[data-type="unrec"][data-idx="'+idx+'"]');
+        var infoVal = infoTa ? infoTa.value.trim() : (sel.infoText||'');
+        if(sel.action === 'update'){
+          p2.memo = infoVal;
+        } else if(sel.action === 'append'){
+          p2.memo = p2.memo ? p2.memo + '\n' + infoVal : infoVal;
+        }
+        saveToSheet(p2);
+        saved++;
+      });
+
+      try { localStorage.removeItem('map_result_cache'); localStorage.removeItem('map_selections_cache'); localStorage.removeItem('map_date_cache'); } catch(e){}
       render();
       toast(saved+'件を保存しました ✓');
-      try { localStorage.removeItem('map_result_cache'); localStorage.removeItem('map_selections_cache'); localStorage.removeItem('map_date_cache'); } catch(e){}
       closeMapUpload();
-    });
+    };
   }
 
   renderResults();
 }
+
+
 
 function openMapSearchOverlay(item, unidx, callback){
   // オーバーレイで検索画面を表示
@@ -1389,8 +1370,7 @@ function openMapNewOverlay(item, unidx, callback){
       status:curStatus, flags:mnovSelFlags.slice(),
       reminder:rem, lastContact:todayStr(),
       makerDate:null, birthday:bd,
-      lectures:lecs,
-      logs: infoText ? [{date:dateStr, text:'MAP: '+infoText}] : []
+      lectures:lecs, logs:[]
     };
     people.unshift(newPerson);
     saveToSheet(newPerson);
