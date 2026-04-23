@@ -412,34 +412,6 @@ function dHTML(p){
 function bindDetail(){
   var p=curP;
   document.getElementById('btn-close').onclick=closeSheet;
-  var addSelFlags=[];
-  function bindAddFlags(){
-    document.querySelectorAll('#add-fwrap .fbtn').forEach(function(btn){
-      btn.onclick=function(){
-        var f=btn.dataset.flag;
-        var i=addSelFlags.indexOf(f);
-        if(i===-1){addSelFlags.push(f);btn.classList.add('on');btn.textContent='✓ '+f;}
-        else{addSelFlags.splice(i,1);btn.classList.remove('on');btn.textContent=f;}
-      };
-    });
-  }
-  bindAddFlags();
-  document.getElementById('add-fadd').onclick=function(){
-    var name=prompt('新しいフラグ名を入力');
-    if(!name||!name.trim()) return;
-    name=name.trim();
-    if(allFlags.includes(name)){toast('すでに存在するフラグです');return;}
-    allFlags.push(name);
-    var wrap=document.getElementById('add-fwrap');
-    var addBtn=document.getElementById('add-fadd');
-    var newBtn=document.createElement('button');
-    newBtn.className='fbtn on';
-    newBtn.dataset.flag=name;
-    newBtn.textContent='✓ '+name;
-    wrap.insertBefore(newBtn, addBtn);
-    addSelFlags.push(name);
-    bindAddFlags();
-  };
 
   function save(){
     var n=document.getElementById('f-name');
