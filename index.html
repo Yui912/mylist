@@ -541,12 +541,41 @@ function openAdd(){
   document.getElementById('btn-close').onclick=closeSheet;
   setTimeout(function(){var n=document.getElementById('f-name');if(n)n.focus();},300);
   var ns='none';
+  var addSelFlags=[];
   document.querySelectorAll('[data-s]').forEach(function(btn){
     btn.onclick=function(){
       ns=btn.dataset.s;
       document.querySelectorAll('[data-s]').forEach(function(b){b.className='sbtn'+(b.dataset.s===ns?' s'+ns:'')});
     };
   });
+  function bindAddFlags(){
+    document.querySelectorAll('#add-fwrap .fbtn').forEach(function(btn){
+      btn.onclick=function(){
+        var f=btn.dataset.flag;
+        var i=addSelFlags.indexOf(f);
+        if(i===-1){addSelFlags.push(f);btn.classList.add('on');btn.textContent='✓ '+f;}
+        else{addSelFlags.splice(i,1);btn.classList.remove('on');btn.textContent=f;}
+      };
+    });
+  }
+  bindAddFlags();
+  var addFadd=document.getElementById('add-fadd');
+  if(addFadd) addFadd.onclick=function(){
+    var name=prompt('新しいフラグ名を入力');
+    if(!name||!name.trim()) return;
+    name=name.trim();
+    if(allFlags.includes(name)){toast('すでに存在するフラグです');return;}
+    allFlags.push(name);
+    var wrap=document.getElementById('add-fwrap');
+    var addBtn=document.getElementById('add-fadd');
+    var newBtn=document.createElement('button');
+    newBtn.className='fbtn on';
+    newBtn.dataset.flag=name;
+    newBtn.textContent='✓ '+name;
+    wrap.insertBefore(newBtn, addBtn);
+    addSelFlags.push(name);
+    bindAddFlags();
+  };
   document.getElementById('btn-save').onclick=function(){
     var name=document.getElementById('f-name').value.trim();
     if(!name){toast('名前を入力してください');return}
@@ -563,7 +592,7 @@ function openAdd(){
     people.unshift({
       id:nextId(),name:name,
       memo:memo?memo.value.trim():'',
-      status:ns,flags:[],
+      status:ns,flags:addSelFlags.slice(),
       reminder:rem?rem.value||null:null,
       lastContact:todayStr(),
       makerDate:mk?mk.value||null:null,
