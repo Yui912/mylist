@@ -131,7 +131,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     <div id="owner-label" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="font-size:11px;color:var(--ink3)" id="filter-count"></div>
-      <button id="btn-search" style="height:32px;padding:0 12px;border-radius:16px;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">名前で検索🔍</button>
+      <button id="btn-search" style="height:32px;padding:0 12px;border-radius:16px;background:var(--surface2);border:1.5px solid var(--border);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">名前🔍</button>
       <button class="hadd" id="btn-add" style="width:auto;padding:0 12px;border-radius:16px;font-size:12px;font-weight:700;white-space:nowrap">List＋</button>
     </div>
   </div>
@@ -1440,8 +1440,7 @@ document.getElementById('btn-add').onclick=openAdd;
 var btnFlagMgr=document.getElementById('btn-flag-mgr');
 if(btnFlagMgr)btnFlagMgr.onclick=function(){openFlagMgr(function(){render();})};
 document.getElementById('overlay').onclick=function(){
-  var mapResult = document.getElementById('map-result');
-  if(mapResult && mapResult.innerHTML) return; // MAP結果表示中は閉じない
+  if(mapLocked) return; // MAP解析結果表示中は閉じない
   closeSheet();
 };
 // チップはrenderChips()で動的生成
