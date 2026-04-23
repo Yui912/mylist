@@ -157,6 +157,31 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 <div id="map-view" style="display:none;position:fixed;inset:0;z-index:200;overflow-y:auto;background:var(--bg)"></div>
 
 <script>
+
+var PW = 'iwillshowyou';
+var SESSION_KEY = 'mylist_auth';
+function checkPW(){
+  var val = document.getElementById('pw-input').value;
+  if(val === PW){
+    sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('pw-screen').style.display = 'none';
+  } else {
+    document.getElementById('pw-err').textContent = 'パスワードが違います';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+// Enterキー対応
+document.addEventListener('DOMContentLoaded', function(){
+  var inp = document.getElementById('pw-input');
+  if(inp) inp.addEventListener('keydown', function(e){ if(e.key==='Enter') checkPW(); });
+  // セッション確認
+  if(sessionStorage.getItem(SESSION_KEY) === '1'){
+    document.getElementById('pw-screen').style.display = 'none';
+  }
+});
+
+
 var LECS = ['洗剤','化粧品','サプリ','水・空気','鍋'];
 var allFlags = ['直以外', 'アプローチしない', '独立'];
 var curFilter = 'all';
@@ -507,6 +532,7 @@ function bindDetail(){
       });
     };
 
+}
 }
 function openAdd(){
   curP=null;
@@ -1576,29 +1602,6 @@ document.querySelectorAll('.tab').forEach(function(el){
 });
 
 
-var PW = 'iwillshowyou';
-var SESSION_KEY = 'mylist_auth';
-function checkPW(){
-  var val = document.getElementById('pw-input').value;
-  if(val === PW){
-    sessionStorage.setItem(SESSION_KEY, '1');
-    document.getElementById('pw-screen').style.display = 'none';
-  } else {
-    document.getElementById('pw-err').textContent = 'パスワードが違います';
-    document.getElementById('pw-input').value = '';
-    document.getElementById('pw-input').focus();
-  }
-}
-// Enterキー対応
-document.addEventListener('DOMContentLoaded', function(){
-  var inp = document.getElementById('pw-input');
-  if(inp) inp.addEventListener('keydown', function(e){ if(e.key==='Enter') checkPW(); });
-  // セッション確認
-  if(sessionStorage.getItem(SESSION_KEY) === '1'){
-    document.getElementById('pw-screen').style.display = 'none';
-  }
-});
-
 // リロード時の画面復元
 if(window.location.hash === '#map'){
   loadFromSheet();
@@ -1620,7 +1623,6 @@ if(window.location.hash === '#map'){
 } else {
   loadFromSheet();
 }
-
-}</script>
+</script>
 </body>
 </html>
