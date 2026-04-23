@@ -95,10 +95,16 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 .linput{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:var(--ink);outline:none}
 .linput:focus{border-color:var(--accent);background:white}
 .lsubmit{padding:9px 14px;background:var(--ink);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;white-space:nowrap}
-.litem{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.litem{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start}
 .litem:last-child{border-bottom:none}
-.ldate{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink3);white-space:nowrap;min-width:50px;padding-top:1px}
-.ltext{font-size:13px;color:var(--ink2);line-height:1.5}
+.litem.selected{background:var(--surface2);margin:0 -20px;padding:10px 20px;border-radius:0}
+.lchk{width:18px;height:18px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:var(--accent)}
+.ldate{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink3);white-space:nowrap;min-width:44px;padding-top:2px}
+.ltext{font-size:13px;color:var(--ink2);line-height:1.6;flex:1;white-space:pre-wrap;word-break:break-all}
+.ledit-btn{background:none;border:none;font-size:14px;color:var(--ink3);cursor:pointer;padding:0 4px;flex-shrink:0}
+.log-edit-area{width:100%;font-size:13px;border:1.5px solid var(--accent);border-radius:8px;padding:6px 8px;resize:none;line-height:1.6;font-family:inherit;background:var(--surface);color:var(--ink)}
+.larow{display:flex;gap:8px;margin-bottom:8px;align-items:flex-end}
+.log-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .savebtn{width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer}
 .savebtn:active{opacity:.85}
 .empty{text-align:center;padding:60px 20px;color:var(--ink3);font-size:14px}
@@ -343,6 +349,19 @@ function openDetail(id){
   bindDetail();
 }
 
+
+function renderLogsHTML(logs){
+  if(!logs||!logs.length) return '<div style="color:var(--ink3);font-size:13px;padding:8px">まだ記録がありません</div>';
+  return logs.map(function(l,i){
+    return '<div class="litem" data-idx="'+i+'">'
+      +'<input type="checkbox" class="lchk" data-idx="'+i+'">'
+      +'<div class="ldate">'+l.date+'</div>'
+      +'<div class="ltext">'+l.text+'</div>'
+      +'<button class="ledit-btn" data-idx="'+i+'" title="編集">✏️</button>'
+      +'</div>';
+  }).join('');
+}
+
 function dHTML(p){
   var lg=LECS.map(function(l){
     return '<div><div class="llabel">'+l+'</div>'
@@ -354,7 +373,7 @@ function dHTML(p){
     var on=p.flags.includes(f);
     return '<button class="fbtn'+(on?' on':'')+'" data-flag="'+f+'">'+(on?'✓ ':'')+f+'</button>';
   }).join('');
-  var li=p.logs.map(function(l){return '<div class="litem"><div class="ldate">'+l.date+'</div><div class="ltext">'+l.text+'</div></div>'}).join('')||'<div style="color:var(--ink3);font-size:13px;padding:8px">まだ記録がありません</div>';
+  var li=renderLogsHTML(p.logs);
   var ss=function(s){return p.status===s?' s'+s:''};
   return '<div class="shdr">'
     +'<div style="flex:1">'
@@ -377,7 +396,15 @@ function dHTML(p){
     +'<div class="fwrap" id="fwrap">'+fb+'<button class="fadd" id="btn-fadd">＋</button></div></div></div>'
     +'<div class="ssec"><div class="ssec-title">レクチャー・デモ履歴</div><div class="lgrid">'+lg+'</div></div>'
     +'<div class="ssec"><div class="ssec-title">コミュニケーション履歴</div>'
-    +'<div class="larow"><input class="linput" id="f-log" placeholder="今日の内容…"><button class="lsubmit" id="btn-ladd">追加</button></div>'
+    +'<div class="larow">'
+    +'<input class="efield" type="date" id="f-log-date" value="'+new Date().toISOString().split('T')[0]+'" style="width:130px;flex-shrink:0;font-size:12px;padding:6px 8px">'
+    +'<input class="linput" id="f-log" placeholder="内容を入力…" style="flex:1">'
+    +'<button class="lsubmit" id="btn-ladd">追加</button>'
+    +'</div>'
+    +'<div class="log-toolbar">'
+    +'<span id="log-sel-count" style="font-size:12px;color:var(--ink3)"></span>'
+    +'<button id="btn-log-del" style="display:none;font-size:12px;color:#C8472B;background:none;border:none;cursor:pointer;font-weight:700">選択削除</button>'
+    +'</div>'
     +'<div id="log-list">'+li+'</div></div>'
     +'<div class="ssec"><button id="btn-delete" style="width:100%;padding:13px;background:white;color:#C8472B;border:1.5px solid #C8472B;border-radius:12px;font-size:14px;font-weight:700;font-family:sans-serif;cursor:pointer">この人を削除する</button></div>';
 }
@@ -485,18 +512,88 @@ function bindDetail(){
       .catch(function(e){console.error('delete error',e)});
     closeSheet();render();toast(p.name+' を削除しました');
   };
+  // ログ関連
+  function refreshLogs(){
+    document.getElementById('log-list').innerHTML = renderLogsHTML(p.logs);
+    bindLogEvents();
+  }
+
+  function bindLogEvents(){
+    var chks = document.querySelectorAll('.lchk');
+    var selCount = document.getElementById('log-sel-count');
+    var delBtn = document.getElementById('btn-log-del');
+
+    chks.forEach(function(chk){
+      chk.onchange = function(){
+        var sel = document.querySelectorAll('.lchk:checked').length;
+        if(selCount) selCount.textContent = sel ? sel+'件選択中' : '';
+        if(delBtn) delBtn.style.display = sel ? 'block' : 'none';
+      };
+    });
+
+    // 編集ボタン
+    document.querySelectorAll('.ledit-btn').forEach(function(btn){
+      btn.onclick = function(){
+        var idx = parseInt(btn.dataset.idx);
+        var item = document.querySelector('.litem[data-idx="'+idx+'"]');
+        var log = p.logs[idx];
+        var dateVal = log.date.replace(/(\d+)\/(\d+)/, function(m,mo,d){
+          return new Date().getFullYear()+'-'+('0'+mo).slice(-2)+'-'+('0'+d).slice(-2);
+        });
+        item.innerHTML =
+          '<input type="date" class="efield log-edit-date" value="'+dateVal+'" style="width:130px;flex-shrink:0;font-size:12px;padding:5px 6px">'
+          +'<textarea class="log-edit-area" rows="2">'+log.text+'</textarea>'
+          +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
+          +'<button class="ledit-btn log-save-btn" data-idx="'+idx+'" title="保存">💾</button>'
+          +'<button class="ledit-btn log-cancel-btn" data-idx="'+idx+'" title="キャンセル">✕</button>'
+          +'</div>';
+
+        item.querySelector('.log-save-btn').onclick = function(){
+          var newDate = item.querySelector('.log-edit-date').value;
+          var d = new Date(newDate);
+          var ds = (d.getMonth()+1)+'/'+d.getDate();
+          var newText = item.querySelector('.log-edit-area').value.trim();
+          if(!newText) return;
+          p.logs[idx] = {date:ds, text:newText};
+          saveToSheet(p);
+          refreshLogs();
+          toast('更新しました ✓');
+        };
+        item.querySelector('.log-cancel-btn').onclick = function(){
+          refreshLogs();
+        };
+      };
+    });
+  }
+
   var ladd=document.getElementById('btn-ladd');
   if(ladd)ladd.onclick=function(){
     var inp=document.getElementById('f-log');
+    var dateInp=document.getElementById('f-log-date');
     var text=inp.value.trim();if(!text)return;
-    var now=new Date();
-    p.logs.unshift({date:(now.getMonth()+1)+'/'+now.getDate(),text:text});
+    var d = dateInp && dateInp.value ? new Date(dateInp.value) : new Date();
+    var ds = (d.getMonth()+1)+'/'+d.getDate();
+    p.logs.unshift({date:ds,text:text});
     inp.value='';
-    document.getElementById('log-list').innerHTML=p.logs.map(function(l){
-      return '<div class="litem"><div class="ldate">'+l.date+'</div><div class="ltext">'+l.text+'</div></div>';
-    }).join('');
+    refreshLogs();
+    saveToSheet(p);
     toast('追加しました ✓');
   };
+
+  var logDelBtn = document.getElementById('btn-log-del');
+  if(logDelBtn) logDelBtn.onclick = function(){
+    var checked = document.querySelectorAll('.lchk:checked');
+    var idxs = [];
+    checked.forEach(function(c){ idxs.push(parseInt(c.dataset.idx)); });
+    if(!idxs.length) return;
+    if(!confirm(idxs.length+'件の履歴を削除しますか？')) return;
+    idxs.sort(function(a,b){return b-a;}).forEach(function(i){ p.logs.splice(i,1); });
+    saveToSheet(p);
+    refreshLogs();
+    toast(idxs.length+'件削除しました');
+  };
+
+  bindLogEvents();
 }
 
 function openAdd(){
