@@ -539,6 +539,23 @@ function bindDetail(){
     };
   });
 
+  var delBtn = document.getElementById('btn-delete');
+  if(delBtn) delBtn.onclick = function(){
+    if(!confirm(p.name + ' を削除しますか？\nこの操作は取り消せません。')) return;
+    // メモリから削除
+    var idx = -1;
+    for(var i = 0; i < people.length; i++){ if(people[i].id === p.id){ idx = i; break; } }
+    if(idx !== -1) people.splice(idx, 1);
+    // GASから削除
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', id: p.id })
+    }).catch(function(e){ console.error('delete error', e); });
+    closeSheet();
+    render();
+    toast(p.name + ' を削除しました');
+  };
+
   function bindFlags(){
     var fwrap=document.getElementById('fwrap');
     if(!fwrap) return;
@@ -567,8 +584,8 @@ function bindDetail(){
         render();
       });
     };
-
-}
+  }
+  bindFlags(); // ← これが抜けていた
 }
 function openAdd(){
   curP=null;
@@ -709,6 +726,31 @@ function openFlagMgr(onClose){
         refresh();
         if(onClose)onClose();
       };
+    });
+
+    // フラグ名編集：フォーカスアウト or Enterで保存
+    document.querySelectorAll('.fmgr-edit').forEach(function(inp){
+      function saveEdit(){
+        var idx = parseInt(inp.dataset.idx);
+        var newName = inp.value.trim();
+        if(!newName) { inp.value = allFlags[idx]; return; } // 空なら元に戻す
+        if(newName === allFlags[idx]) return; // 変更なし
+        if(allFlags.includes(newName)) { toast('同じ名前のフラグが既にあります'); inp.value = allFlags[idx]; return; }
+        var oldName = allFlags[idx];
+        allFlags[idx] = newName;
+        // そのフラグを持つ全員のデータを更新
+        people.forEach(function(p){
+          var fi = p.flags.indexOf(oldName);
+          if(fi !== -1){
+            p.flags[fi] = newName;
+            saveToSheet(p);
+          }
+        });
+        toast(oldName + ' → ' + newName + ' に変更しました');
+        if(onClose) onClose();
+      }
+      inp.addEventListener('blur', saveEdit);
+      inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ inp.blur(); } });
     });
 
     function addFlag(){
