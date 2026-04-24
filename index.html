@@ -200,6 +200,7 @@ var isLoading = false;
 // ── 保存キュー（並列保存によるデータ破壊を防ぐ） ──
 var _saveQueue = [];
 var _saveRunning = false;
+var _saveTimer = null; // debounceタイマー（グローバル管理でcloseSheet時にキャンセル可能）
 function _runSaveQueue(){
   if(_saveRunning || _saveQueue.length === 0) return;
   _saveRunning = true;
@@ -229,6 +230,10 @@ function saveToSheet(person){
 function loadFromSheet(){
   isLoading = true;
   document.getElementById('list-wrap').innerHTML = '<div class="empty">読み込み中…</div>';
+  // 読み込み中は操作ボタンを無効化
+  ['btn-add','btn-search','btn-menu'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.disabled=true;
+  });
   fetch(GAS_URL + '?action=getAll&owner=' + OWNER)
     .then(function(r){ return r.json(); })
     .then(function(data){
@@ -260,10 +265,16 @@ function loadFromSheet(){
         toReset.forEach(function(p){ saveToSheet(p); });
       }
       isLoading = false;
+      ['btn-add','btn-search','btn-menu'].forEach(function(id){
+        var el=document.getElementById(id); if(el) el.disabled=false;
+      });
       render();
     })
     .catch(function(e){
       isLoading = false;
+      ['btn-add','btn-search','btn-menu'].forEach(function(id){
+        var el=document.getElementById(id); if(el) el.disabled=false;
+      });
       document.getElementById('list-wrap').innerHTML = '<div class="empty">読み込みエラー。再読み込みしてください。</div>';
     });
 }
@@ -291,7 +302,7 @@ function bdDaysUntil(bd){
 function getList(){
   var list=people.slice();
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
-  if(curFilter!=='all')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
+  if(curFilter!=='all' && curFilter!=='noapproach')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
   if(curFilter==='nextapo'){
     var today=new Date(); today.setHours(0,0,0,0);
     list=list.filter(function(p){
@@ -350,36 +361,7 @@ function render(){
     if(soon.length){html+='<div class="slabel">🔴 今すぐ</div>';soon.forEach(function(p){html+=cHTML(p)})}
     if(up.length){html+='<div class="slabel">近日中</div>';up.forEach(function(p){html+=cHTML(p)})}
   } else if(curFilter==='birthday'){
-    var todayBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000)===0;
-    });
-    var yesterdayBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000)===-1;
-    });
-    var tomorrowBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000)===1;
-    });
-    var restBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      var d=Math.round((next-now)/86400000);
-      return d>1&&d<=30;
-    });
-    if(todayBD.length){html+='<div class="slabel">🎂 今日</div>';todayBD.forEach(function(p){html+=cHTML(p)})}
-    if(yesterdayBD.length){html+='<div class="slabel">昨日</div>';yesterdayBD.forEach(function(p){html+=cHTML(p)})}
-    if(tomorrowBD.length){html+='<div class="slabel">明日</div>';tomorrowBD.forEach(function(p){html+=cHTML(p)})}
-    if(restBD.length){html+='<div class="slabel">近い人</div>';restBD.forEach(function(p){html+=cHTML(p)})}
-    if(!list.length){html='<div class="empty">30日以内に誕生日の人はいません</div>'}
+    html+=renderBirthdayHTML(list);
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
     list.forEach(function(p){html+=cHTML(p)});
@@ -492,11 +474,13 @@ function dHTML(p){
     +'<div class="ssec"><button id="btn-delete" style="width:100%;padding:13px;background:white;color:#C8472B;border:1.5px solid #C8472B;border-radius:12px;font-size:14px;font-weight:700;font-family:sans-serif;cursor:pointer">この人を削除する</button></div>';
 }
 
-function bindDetail(){
+function bindDetail(inMap){
   var p=curP;
+  // ctxはMAP詳細オーバーレイのとき対象DOMを絞るためのコンテキスト要素
+  var ctx=inMap ? (document.getElementById('mdo-body')||document) : document;
   document.getElementById('btn-close').onclick=closeSheet;
 
-  function save(){
+  function save(updateContact){
     var n=document.getElementById('f-name');
     var m=document.getElementById('f-memo');
     var r=document.getElementById('f-reminder');
@@ -509,38 +493,55 @@ function bindDetail(){
     if(na)p.nextApo=na.value||null;
     var bd=document.getElementById('f-birthday');
     if(bd)p.birthday=bd.value||null;
-    document.querySelectorAll('[data-lec]').forEach(function(el){
+    ctx.querySelectorAll('[data-lec]').forEach(function(el){
       p.lectures[el.dataset.lec]=el.value?el.value.replace(/-/g,'/'):null;
     });
+    if(updateContact) p.lastContact=todayStr();
     render();toast('保存済み ✓');
-    saveToSheet(p);
+    if(updateContact){
+      // 日付・ステータス・フラグ等の明示的操作は即時保存
+      if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; }
+      saveToSheet(p);
+    } else {
+      // 名前・メモの文字入力は800ms後にまとめて1回だけ保存
+      if(_saveTimer) clearTimeout(_saveTimer);
+      _saveTimer = setTimeout(function(){
+        _saveTimer = null;
+        saveToSheet(p);
+      }, 800);
+    }
   }
 
-  document.querySelectorAll('.clr-btn').forEach(function(btn){
+  ctx.querySelectorAll('.clr-btn').forEach(function(btn){
     btn.onclick=function(){
       var el=document.getElementById(btn.dataset.target);
-      if(el){ el.value=''; save(); }
+      if(el){ el.value=''; save(true); }
     };
   });
-  var fn=document.getElementById('f-name');if(fn)fn.addEventListener('input',save);
-  var fm=document.getElementById('f-memo');if(fm)fm.addEventListener('input',save);
-  var fna=document.getElementById('f-nextapo');if(fna)fna.addEventListener('change',save);
-  var fr=document.getElementById('f-reminder');if(fr)fr.addEventListener('change',save);
-  var fmk=document.getElementById('f-maker');if(fmk)fmk.addEventListener('change',save);
-  var fbd=document.getElementById('f-birthday');if(fbd)fbd.addEventListener('change',save);
-  document.querySelectorAll('[data-lec]').forEach(function(el){el.addEventListener('change',save)});
+  var fn=document.getElementById('f-name');if(fn)fn.addEventListener('input',function(){save(false);});
+  var fm=document.getElementById('f-memo');if(fm)fm.addEventListener('input',function(){save(false);});
+  var fna=document.getElementById('f-nextapo');if(fna)fna.addEventListener('change',function(){save(true);});
+  var fr=document.getElementById('f-reminder');if(fr)fr.addEventListener('change',function(){save(true);});
+  var fmk=document.getElementById('f-maker');if(fmk)fmk.addEventListener('change',function(){save(true);});
+  var fbd=document.getElementById('f-birthday');if(fbd)fbd.addEventListener('change',function(){save(true);});
+  ctx.querySelectorAll('[data-lec]').forEach(function(el){el.addEventListener('change',function(){save(true);});});
 
-  document.querySelectorAll('[data-s]').forEach(function(btn){
+  ctx.querySelectorAll('[data-s]').forEach(function(btn){
     btn.onclick=function(){
       p.status=btn.dataset.s;
-      document.querySelectorAll('[data-s]').forEach(function(b){b.className='sbtn'+(b.dataset.s===p.status?' s'+p.status:'')});
+      ctx.querySelectorAll('[data-s]').forEach(function(b){b.className='sbtn'+(b.dataset.s===p.status?' s'+p.status:'')});
+      p.lastContact=todayStr();
       render();toast('保存済み ✓');
       saveToSheet(p);
     };
   });
 
   var delBtn = document.getElementById('btn-delete');
-  if(delBtn) delBtn.onclick = function(){
+  if(delBtn && inMap){
+    // MAP画面中は誤削除防止のため削除ボタンを非表示
+    delBtn.style.display = 'none';
+  }
+  if(delBtn && !inMap) delBtn.onclick = function(){
     if(!confirm(p.name + ' を削除しますか？\nこの操作は取り消せません。')) return;
     // メモリから削除
     var idx = -1;
@@ -566,6 +567,7 @@ function bindDetail(){
         if(idx===-1)p.flags.push(f);else p.flags.splice(idx,1);
         btn.className='fbtn'+(p.flags.includes(f)?' on':'');
         btn.textContent=(p.flags.includes(f)?'✓ ':'')+f;
+        p.lastContact=todayStr();
         render();toast('保存済み ✓');
         saveToSheet(p);
       };
@@ -657,7 +659,9 @@ function openAdd(){
     if(!name){toast('名前を入力してください');return}
     var lecs={};
     LECS.forEach(function(l){lecs[l]=null});
-    document.querySelectorAll('[data-lec]').forEach(function(el){
+    // sheet-bodyをコンテキストにしてスコープを限定（document全体を誤って参照しない）
+    var sheetCtx = document.getElementById('sheet-body') || document;
+    sheetCtx.querySelectorAll('[data-lec]').forEach(function(el){
       lecs[el.dataset.lec]=el.value?el.value.replace(/-/g,'/'):null;
     });
     var memo=document.getElementById('f-memo');
@@ -721,8 +725,21 @@ function openFlagMgr(onClose){
       btn.onclick = function(){
         var idx = parseInt(btn.dataset.idx);
         var f = allFlags[idx];
+        // 影響人数を計算して確認ダイアログを出す
+        var affected = people.filter(function(p){ return p.flags.indexOf(f) !== -1; }).length;
+        var msg = '「' + f + '」を削除しますか？';
+        if(affected > 0) msg += '
+（このフラグを持つ' + affected + '人から削除されます）';
+        if(!confirm(msg)) return;
         allFlags.splice(idx, 1);
-        people.forEach(function(p){ var i=p.flags.indexOf(f); if(i!==-1)p.flags.splice(i,1); });
+        // そのフラグを持つ全員からフラグを除去してスプシに保存
+        people.forEach(function(p){
+          var i = p.flags.indexOf(f);
+          if(i !== -1){
+            p.flags.splice(i, 1);
+            saveToSheet(p);
+          }
+        });
         refresh();
         if(onClose)onClose();
       };
@@ -840,6 +857,23 @@ function renderChips(){
   if(mgr)mgr.onclick=function(){openFlagMgr(function(){render();})};
 }
 
+function renderBirthdayHTML(list){
+  var html='';
+  var todayBD=list.filter(function(p){ return bdDaysUntil(p.birthday)===0; });
+  var yesterdayBD=list.filter(function(p){ return bdDaysUntil(p.birthday)===-1; });
+  var tomorrowBD=list.filter(function(p){ return bdDaysUntil(p.birthday)===1; });
+  var restBD=list.filter(function(p){
+    var d=bdDaysUntil(p.birthday);
+    return d>1&&d<=30;
+  });
+  if(todayBD.length){html+='<div class="slabel">🎂 今日</div>';todayBD.forEach(function(p){html+=cHTML(p)})}
+  if(yesterdayBD.length){html+='<div class="slabel">昨日</div>';yesterdayBD.forEach(function(p){html+=cHTML(p)})}
+  if(tomorrowBD.length){html+='<div class="slabel">明日</div>';tomorrowBD.forEach(function(p){html+=cHTML(p)})}
+  if(restBD.length){html+='<div class="slabel">近い人</div>';restBD.forEach(function(p){html+=cHTML(p)})}
+  if(!list.length){html='<div class="empty">30日以内に誕生日の人はいません</div>'}
+  return html;
+}
+
 function renderList(){
   var list=getList();
   // filter-count removed
@@ -860,36 +894,7 @@ function renderList(){
     if(soon.length){html+='<div class="slabel">🔴 今すぐ</div>';soon.forEach(function(p){html+=cHTML(p)})}
     if(up.length){html+='<div class="slabel">近日中</div>';up.forEach(function(p){html+=cHTML(p)})}
   } else if(curFilter==='birthday'){
-    var todayBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000)===0;
-    });
-    var yesterdayBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000)===-1;
-    });
-    var tomorrowBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      return Math.round((next-now)/86400000)===1;
-    });
-    var restBD=list.filter(function(p){
-      var now=new Date();now.setHours(0,0,0,0);
-      var parts=p.birthday.split('-');
-      var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
-      var d=Math.round((next-now)/86400000);
-      return d>1&&d<=30;
-    });
-    if(todayBD.length){html+='<div class="slabel">🎂 今日</div>';todayBD.forEach(function(p){html+=cHTML(p)})}
-    if(yesterdayBD.length){html+='<div class="slabel">昨日</div>';yesterdayBD.forEach(function(p){html+=cHTML(p)})}
-    if(tomorrowBD.length){html+='<div class="slabel">明日</div>';tomorrowBD.forEach(function(p){html+=cHTML(p)})}
-    if(restBD.length){html+='<div class="slabel">近い人</div>';restBD.forEach(function(p){html+=cHTML(p)})}
-    if(!list.length){html='<div class="empty">30日以内に誕生日の人はいません</div>'}
+    html+=renderBirthdayHTML(list);
   } else if(curFilter==='random'){
     html+='<div class="slabel">🎲 ランダム</div>';
     list.forEach(function(p){html+=cHTML(p)});
@@ -1277,6 +1282,17 @@ function showMapResult(result){
       html='<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">人物が検出されませんでした</div>';
     }
 
+    // 未処理件数を計算して表示
+    var unprocCount = unrecItems.filter(function(item, idx){
+      var key='unrec_'+idx;
+      var sel=mapSelections[key]||{};
+      return !sel.action && !sel.personId;
+    }).length;
+    if(unprocCount > 0){
+      html+='<div style="padding:8px 12px;background:#FEF3E2;border-radius:10px;margin-bottom:8px;display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:13px;color:#C07800;font-weight:600">⚠️ 確認が必要な人が'+unprocCount+'件未処理です</span>'
+        +'</div>';
+    }
     html+='<div style="padding:8px 0 20px"><button id="btn-map-save" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">保存する</button></div>';
 
     section.innerHTML = html;
@@ -1349,7 +1365,8 @@ function showMapResult(result){
         var infoText=mie?mie.value:makeInfoText(unrecItems[idx]);
         openMapNewOverlay(unrecItems[idx], idx, function(name){
           var newP=people[0];
-          mapSelections[key]={personId:newP.id,infoText:infoText,memoText:newP.memo||'',reminder:newP.reminder||'',nextApo:newP.nextApo||'',action:''};
+          // 新規追加した人はMAP情報をそのまま追記するのが自然なのでappendをデフォルトにする
+          mapSelections[key]={personId:newP.id,infoText:infoText,memoText:newP.memo||'',reminder:newP.reminder||'',nextApo:newP.nextApo||'',action:'append'};
           renderResults();
         });
       };
@@ -1413,7 +1430,7 @@ function showMapResult(result){
         };
 
         // 詳細画面のbindDetailを適用（btn-closeをmdo-backに向ける）
-        bindDetail();
+        bindDetail(true); // MAP中なので削除ボタン非表示
         document.getElementById('btn-close').onclick = function(){
           var existing = document.getElementById('map-detail-overlay');
           if(existing) existing.remove();
@@ -1441,6 +1458,7 @@ function showMapResult(result){
         if(mre&&mre.value) p2.reminder=mre.value;
         var mnae2=section.querySelector('.mnae[data-key="'+key+'"]');
         if(mnae2) p2.nextApo=mnae2.value||null;
+        p2.lastContact=todayStr(); // MAP保存時に最終連絡日を更新
         saveToSheet(p2); saved++;
       });
       unrecItems.forEach(function(item,idx){
@@ -1462,6 +1480,7 @@ function showMapResult(result){
         if(mre&&mre.value) p2.reminder=mre.value;
         var mnae3=section.querySelector('.mnae[data-key="'+key+'"]');
         if(mnae3) p2.nextApo=mnae3.value||null;
+        p2.lastContact=todayStr(); // MAP保存時に最終連絡日を更新
         saveToSheet(p2); saved++;
       });
       try{localStorage.removeItem('map_result_cache');localStorage.removeItem('map_selections_cache');localStorage.removeItem('map_date_cache');}catch(e){}
@@ -1645,11 +1664,14 @@ function openMapNewOverlay(item, unidx, callback){
 
 function closeSheet(){
   if(mapLocked) return;
+  // debounceタイマーが残っていたら即時フラッシュして保存してからシートを閉じる
+  if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; }
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').classList.remove('open');
 }
 function forceCloseSheet(){
   mapLocked = false;
+  if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; }
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').classList.remove('open');
 }
@@ -1680,6 +1702,19 @@ document.querySelectorAll('.tab').forEach(function(el){
 });
 
 
+// ブラウザバック対応（スマホで戻るボタンを押したとき）
+window.addEventListener('popstate', function(){
+  var isMapView = document.getElementById('map-view').style.display === 'block';
+  if(isMapView){
+    // MAP画面表示中に戻るを押した → MAP画面を閉じる
+    mapLocked = false;
+    mapSelections = {};
+    try { localStorage.removeItem('map_result_cache'); localStorage.removeItem('map_selections_cache'); localStorage.removeItem('map_date_cache'); } catch(e){}
+    document.getElementById('main-view').style.display = 'block';
+    document.getElementById('map-view').style.display = 'none';
+  }
+});
+
 // リロード時の画面復元
 if(window.location.hash === '#map'){
   loadFromSheet();
@@ -1690,6 +1725,12 @@ if(window.location.hash === '#map'){
       try {
         var cached = localStorage.getItem('map_result_cache');
         var selCached = localStorage.getItem('map_selections_cache');
+        var dateCached = localStorage.getItem('map_date_cache');
+        // MAP日付を復元
+        if(dateCached){
+          var dateEl = document.getElementById('map-date');
+          if(dateEl) dateEl.value = dateCached;
+        }
         if(cached){
           mapLocked = true;
           if(selCached) mapSelections = JSON.parse(selCached);
