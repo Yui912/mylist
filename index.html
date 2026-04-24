@@ -197,10 +197,10 @@ var GAS_URL = 'https://script.google.com/macros/s/AKfycbw2EBflnMw7aNdMShBe1Srjaa
 var people = [];
 var isLoading = false;
 
-// ── 保存キュー（並列保存によるデータ破壊を防ぐ） ──
+// -- save queue (serialize requests to prevent data corruption) --
 var _saveQueue = [];
 var _saveRunning = false;
-var _saveTimer = null; // debounceタイマー（グローバル管理でcloseSheet時にキャンセル可能）
+var _saveTimer = null; // debounce timer - global scope so closeSheet() can cancel it
 function _runSaveQueue(){
   if(_saveRunning || _saveQueue.length === 0) return;
   _saveRunning = true;
@@ -215,7 +215,7 @@ function _runSaveQueue(){
 }
 function saveToSheet(person){
   person.owner = OWNER;
-  // 同じIDが既にキューにあれば最新で上書き（重複排除）
+  // if same ID already in queue, overwrite with latest (dedup)
   var exists = false;
   for(var i = 0; i < _saveQueue.length; i++){
     if(_saveQueue[i].person.id === person.id){
@@ -261,7 +261,7 @@ function loadFromSheet(){
             });
           }
         });
-        // アポリセットは直列キューで順番に保存（並列禁止）
+        // reset past apo dates - save in series via queue
         toReset.forEach(function(p){ saveToSheet(p); });
       }
       isLoading = false;
@@ -659,7 +659,7 @@ function openAdd(){
     if(!name){toast('名前を入力してください');return}
     var lecs={};
     LECS.forEach(function(l){lecs[l]=null});
-    // sheet-bodyをコンテキストにしてスコープを限定（document全体を誤って参照しない）
+    // use sheet-body as context to avoid querying entire document
     var sheetCtx = document.getElementById('sheet-body') || document;
     sheetCtx.querySelectorAll('[data-lec]').forEach(function(el){
       lecs[el.dataset.lec]=el.value?el.value.replace(/-/g,'/'):null;
@@ -728,8 +728,7 @@ function openFlagMgr(onClose){
         // 影響人数を計算して確認ダイアログを出す
         var affected = people.filter(function(p){ return p.flags.indexOf(f) !== -1; }).length;
         var msg = '「' + f + '」を削除しますか？';
-        if(affected > 0) msg += '
-（このフラグを持つ' + affected + '人から削除されます）';
+        if(affected > 0) msg += '\n(' + affected + '人から削除されます)';
         if(!confirm(msg)) return;
         allFlags.splice(idx, 1);
         // そのフラグを持つ全員からフラグを除去してスプシに保存
@@ -1312,7 +1311,7 @@ function showMapResult(result){
       };
     });
 
-    // アクションボタン（更新/追記/なし）
+    // action buttons (update / append / none)
     section.querySelectorAll('.mab').forEach(function(btn){
       btn.onclick = function(){
         var key=btn.dataset.key;
@@ -1398,7 +1397,7 @@ function showMapResult(result){
       };
     });
 
-    // 詳細を見る（MAP画面の上にオーバーレイで詳細画面を表示）
+    // detail button - show overlay on top of MAP screen
     section.querySelectorAll('.mdb').forEach(function(btn){
       btn.onclick = function(){
         var pid = parseInt(btn.dataset.pid);
@@ -1416,20 +1415,20 @@ function showMapResult(result){
           +'<div id="mdo-body"></div>';
         document.body.appendChild(ov);
 
-        // 詳細HTMLを描画（dHTMLを流用）
+        // render detail HTML using dHTML
         curP = p2;
         document.getElementById('mdo-body').innerHTML = dHTML(p2);
 
         // 閉じるボタン
         document.getElementById('mdo-back').onclick = function(){
-          // 変更をrenderResultsに反映（メモが変わった場合）
+          // reflect changes to renderResults on close
           var existing = document.getElementById('map-detail-overlay');
           if(existing) existing.remove();
           curP = null;
           renderResults();
         };
 
-        // 詳細画面のbindDetailを適用（btn-closeをmdo-backに向ける）
+        // apply bindDetail - redirect btn-close to mdo-back
         bindDetail(true); // MAP中なので削除ボタン非表示
         document.getElementById('btn-close').onclick = function(){
           var existing = document.getElementById('map-detail-overlay');
@@ -1702,7 +1701,7 @@ document.querySelectorAll('.tab').forEach(function(el){
 });
 
 
-// ブラウザバック対応（スマホで戻るボタンを押したとき）
+// handle browser back button (important for mobile)
 window.addEventListener('popstate', function(){
   var isMapView = document.getElementById('map-view').style.display === 'block';
   if(isMapView){
