@@ -136,7 +136,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     </div>
   </div>
   <div class="chip-strip" id="chip-strip">
-    <!-- 動的に生成 -->
+    <!-- generated dynamically -->
+  </div>
+  <div style="display:flex;gap:16px;padding:4px 0 8px;font-size:12px;color:var(--ink2)">
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="checkbox" id="chk-exclude-naoi" style="width:14px;height:14px;accent-color:var(--accent)">直以外を除く
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="checkbox" id="chk-exclude-noapproach" style="width:14px;height:14px;accent-color:var(--accent)">アプローチしないを除く
+    </label>
   </div>
   <div class="tabs" id="tabs-wrap">
     <div class="tab active" data-c="all">全員</div>
@@ -188,6 +196,8 @@ var curFilter = 'all';
 var curCat = 'all';
 var curP = null;
 var mapLocked = false;
+var excludeNaoi = localStorage.getItem('excl_naoi') === '1';
+var excludeNoapproach = localStorage.getItem('excl_noapproach') === '1';
 
 // URLパラメータからownerを取得
 var urlParams = new URLSearchParams(window.location.search);
@@ -302,7 +312,12 @@ function bdDaysUntil(bd){
 function getList(){
   var list=people.slice();
   if(curCat!=='all')list=list.filter(function(p){return p.status===curCat});
-  if(curFilter!=='all' && curFilter!=='noapproach')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
+  // チェックボックスによる除外（フィルターチップより先に適用）
+  // フィルターチップ自体でその属性を絞り込んでいる場合は除外しない
+  if(excludeNaoi && curFilter!=='naoi')list=list.filter(function(p){return !p.flags.includes('直以外')});
+  if(excludeNoapproach && curFilter!=='noapproach')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
+  // noapproachフィルター以外のとき「アプローチしない」を除外する既存ロジック（excludeNoapproachがOFFのときのみ）
+  if(!excludeNoapproach && curFilter!=='all' && curFilter!=='noapproach')list=list.filter(function(p){return !p.flags.includes('アプローチしない')});
   if(curFilter==='nextapo'){
     var today=new Date(); today.setHours(0,0,0,0);
     list=list.filter(function(p){
@@ -792,8 +807,13 @@ function renderChips(){
   var strip=document.getElementById('chip-strip');
   if(!strip)return;
 
-  var rc=people.filter(function(p){return p.reminder}).length;
-  var bc=people.filter(function(p){
+  // 除外チェックを反映した基準リスト（カスタムフラグ・次アポ等のカウントに使う）
+  var base=people.slice();
+  if(excludeNaoi)base=base.filter(function(p){return !p.flags.includes('直以外')});
+  if(excludeNoapproach)base=base.filter(function(p){return !p.flags.includes('アプローチしない')});
+
+  var rc=base.filter(function(p){return p.reminder}).length;
+  var bc=base.filter(function(p){
     if(!p.birthday)return false;
     var now=new Date();var parts=p.birthday.split('-');
     var next=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
@@ -802,7 +822,9 @@ function renderChips(){
   }).length;
 
   var customFlags=allFlags.filter(function(f){return f!=='アプローチしない'&&f!=='独立'&&f!=='直以外'});
+  // 直以外・アプローチしないのチップ件数はpeople全体から（フィルター自体の人数を示す）
   var nac=people.filter(function(p){return p.flags.includes('アプローチしない')}).length;
+  var naoc=people.filter(function(p){return p.flags.includes('直以外')}).length;
 
   function chip(f,label,dot){
     var active=curFilter===f?' active':'';
@@ -812,7 +834,7 @@ function renderChips(){
 
   var html='';
   html+='<button id="btn-flag-mgr" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">＋</button>';
-  var ac=people.filter(function(p){
+  var ac=base.filter(function(p){
     if(!p.nextApo) return false;
     var today=new Date(); today.setHours(0,0,0,0);
     return new Date(p.nextApo)>=today;
@@ -823,11 +845,12 @@ function renderChips(){
   html+=chip('birthday','🎂 誕生日近い ('+bc+')','');
   html+=chip('random','🎲 ランダム','');
   customFlags.forEach(function(f){
-    var cnt=people.filter(function(p){return p.flags.includes(f)}).length;
+    var cnt=base.filter(function(p){return p.flags.includes(f)}).length;
     html+=chip(f,f+' ('+cnt+')','');
   });
-  var indc=people.filter(function(p){return p.flags.includes('独立')}).length;
+  var indc=base.filter(function(p){return p.flags.includes('独立')}).length;
   if(indc>0)html+=chip('independent','独立 ('+indc+')','');
+  if(naoc>0)html+=chip('naoi','直以外 ('+naoc+')','');
   if(nac>0)html+=chip('noapproach','アプローチしない ('+nac+')','');
 
   strip.innerHTML=html;
@@ -1692,6 +1715,18 @@ document.getElementById('overlay').onclick=function(){
 // チップはrenderChips()で動的生成
 document.getElementById('btn-search').onclick=openSearch;
 document.getElementById('btn-menu').onclick=openMenu;
+
+// exclude checkboxes - persist to localStorage
+document.getElementById('chk-exclude-naoi').onchange=function(){
+  excludeNaoi=this.checked;
+  localStorage.setItem('excl_naoi', excludeNaoi ? '1' : '0');
+  renderList();
+};
+document.getElementById('chk-exclude-noapproach').onchange=function(){
+  excludeNoapproach=this.checked;
+  localStorage.setItem('excl_noapproach', excludeNoapproach ? '1' : '0');
+  renderList();
+};
 document.querySelectorAll('.tab').forEach(function(el){
   el.onclick=function(){
     curCat=el.dataset.c;
@@ -1741,6 +1776,13 @@ if(window.location.hash === '#map'){
 } else {
   loadFromSheet();
 }
+// restore checkbox state from localStorage
+(function(){
+  var cn = document.getElementById('chk-exclude-naoi');
+  var ca = document.getElementById('chk-exclude-noapproach');
+  if(cn) cn.checked = excludeNaoi;
+  if(ca) ca.checked = excludeNoapproach;
+})();
 </script>
 </body>
 </html>
